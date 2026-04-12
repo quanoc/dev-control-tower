@@ -345,7 +345,9 @@ export function createPipelineInstance(taskId: number, templateId: number | null
       'INSERT INTO pipeline_stage_runs (instance_id, stage_key, agent_id) VALUES (?, ?, ?)'
     );
     for (const stage of stages) {
-      insertStage.run(instanceId, stage.key, stage.agentId);
+      // Provide default agent_id for human/system stages
+      const agentId = stage.agentId || stage.humanRole || stage.action || 'system';
+      insertStage.run(instanceId, stage.key, agentId);
     }
 
     return instanceId;
