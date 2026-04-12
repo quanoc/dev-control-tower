@@ -1,0 +1,13 @@
+{
+  "name": "ai-pipeline-dashboard",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "start": "pnpm -r --parallel start"
+  },
+  "devDependencies": {},
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+  }
+}

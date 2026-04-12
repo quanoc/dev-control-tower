@@ -1,0 +1,10 @@
+{
+  "name": "@pipeline/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/types.ts",
+  "types": "src/types.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
