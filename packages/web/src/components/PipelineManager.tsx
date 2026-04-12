@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit2, X, GitBranch, Check } from 'lucide-react';
 import { api } from '../api/client';
 import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, ExecutionMode, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
 import { PipelinePreview } from './PipelinePreview';
-import { StageEditor } from './StageEditor';
+import { StepDrawer } from './StepDrawer';
 import { StagePicker } from './StagePicker';
 import { getActionDef, PRESET_TEMPLATES } from '@pipeline/shared';
 
@@ -397,13 +397,13 @@ export function PipelineManager() {
                 </div>
               </div>
 
-              {/* Stage Editor or Picker */}
+              {/* Step Drawer */}
               {selectedStep && !showPicker && (() => {
                 const phase = formData.phases.find(p => p.phaseKey === selectedStep.phaseKey);
                 const step = phase?.steps[selectedStep.stepIndex];
                 if (!step) return null;
                 return (
-                  <StageEditor
+                  <StepDrawer
                     step={step}
                     phaseKey={selectedStep.phaseKey as PhaseKey}
                     onChange={(field, value) => updateStep(selectedStep.phaseKey, selectedStep.stepIndex, field, value)}
