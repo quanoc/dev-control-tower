@@ -92,7 +92,8 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
   // Helper to get agent name from ID
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
-    return agent?.name || agentId;
+    if (!agent) return agentId;
+    return agent.role ? `${agent.name}(${agent.role})` : agent.name;
   };
 
   // Form state
