@@ -109,17 +109,6 @@ function App() {
             任务控制台
           </button>
           <button
-            onClick={() => setCurrentPage('pipelines')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              currentPage === 'pipelines'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            <GitBranch className="w-4 h-4" />
-            流水线模板
-          </button>
-          <button
             onClick={() => setCurrentPage('components')}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               currentPage === 'components'
@@ -129,6 +118,17 @@ function App() {
           >
             <GitBranch className="w-4 h-4" />
             流水线组件
+          </button>
+          <button
+            onClick={() => setCurrentPage('pipelines')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              currentPage === 'pipelines'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            流水线模板
           </button>
         </div>
       </header>
@@ -194,15 +194,15 @@ function App() {
             />
           )}
         </>
-      ) : currentPage === 'pipelines' ? (
-        /* Pipeline Templates Page */
-        <main className="flex-1 px-6 py-6">
-          <PipelineManager />
-        </main>
-      ) : (
+      ) : currentPage === 'components' ? (
         /* Pipeline Components Page */
         <main className="flex-1 px-6 py-6">
           <ComponentLibrary />
+        </main>
+      ) : (
+        /* Pipeline Templates Page */
+        <main className="flex-1 px-6 py-6">
+          <PipelineManager />
         </main>
       )}
     </div>
