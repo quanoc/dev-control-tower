@@ -5,7 +5,6 @@ import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, Execution
 import { PipelinePreview } from './PipelinePreview';
 import { StageEditor } from './StageEditor';
 import { StagePicker } from './StagePicker';
-import { ComponentLibrary } from './ComponentLibrary';
 import { getActionDef, PRESET_TEMPLATES } from '@pipeline/shared';
 
 const COMPLEXITY_OPTIONS = [
@@ -46,7 +45,6 @@ function emptyForm(): TemplateFormData {
 }
 
 export function PipelineManager() {
-  const [view, setView] = useState<'templates' | 'components'>('templates');
   const [templates, setTemplates] = useState<PipelineTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -217,11 +215,6 @@ export function PipelineManager() {
     setNewPhaseName('');
   };
 
-  // Show component library if view is components
-  if (view === 'components') {
-    return <ComponentLibrary onBack={() => setView('templates')} />;
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -239,14 +232,6 @@ export function PipelineManager() {
           <p className="text-sm text-gray-500 mt-1">管理研发流程的流水线模板</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView('components')}
-            className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-              view === 'components' ? 'text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            流水线组件
-          </button>
           <button
             onClick={() => setShowForm(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"

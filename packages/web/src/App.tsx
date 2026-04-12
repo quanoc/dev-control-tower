@@ -5,12 +5,13 @@ import { AgentDrawer } from './components/AgentDrawer';
 import { TaskList } from './components/TaskList';
 import { NewTaskDialog } from './components/NewTaskDialog';
 import { PipelineManager } from './components/PipelineManager';
+import { ComponentLibrary } from './components/ComponentLibrary';
 import { useAgentStore } from './store/agents';
 import { useTaskStore } from './store/tasks';
 import { api } from './api/client';
 import type { PipelineTemplate } from '@pipeline/shared';
 
-type Page = 'tasks' | 'pipelines';
+type Page = 'tasks' | 'pipelines' | 'components';
 
 function App() {
   const agents = useAgentStore(s => s.agents);
@@ -116,7 +117,18 @@ function App() {
             }`}
           >
             <GitBranch className="w-4 h-4" />
-            流水线管理
+            流水线模板
+          </button>
+          <button
+            onClick={() => setCurrentPage('components')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              currentPage === 'components'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            流水线组件
           </button>
         </div>
       </header>
@@ -182,10 +194,15 @@ function App() {
             />
           )}
         </>
-      ) : (
-        /* Pipeline Management Page */
+      ) : currentPage === 'pipelines' ? (
+        /* Pipeline Templates Page */
         <main className="flex-1 px-6 py-6">
           <PipelineManager />
+        </main>
+      ) : (
+        /* Pipeline Components Page */
+        <main className="flex-1 px-6 py-6">
+          <ComponentLibrary />
         </main>
       )}
     </div>
