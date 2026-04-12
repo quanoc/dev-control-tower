@@ -521,15 +521,33 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
   // Get template info if template exists
   let templateName: string | undefined;
   let templatePhases: PipelinePhase[] | undefined;
+  let templateStages: PipelineStage[] = [];
   if (row.template_id) {
-    const template = db.prepare('SELECT name, phases FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string; phases: string } | undefined;
+    const template = db.prepare('SELECT name, phases, stages FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string; phases: string; stages: string } | undefined;
     if (template) {
       templateName = template.name;
       if (template.phases) {
         templatePhases = JSON.parse(template.phases);
       }
+      if (template.stages) {
+        templateStages = JSON.parse(template.stages);
+      }
     }
   }
+
+  // Create lookup map from template stages
+  const stageLookup = new Map(templateStages.map(s => [s.key, s]));
+
+  // Enrich stageRuns with data from template if missing
+  const enrichedStageRuns = stageRows.map(sr => {
+    const templateStage = stageLookup.get(sr.stage_key);
+    return {
+      ...rowToStageRun(sr),
+      // Use stored value, or fall back to template
+      phaseKey: sr.phase_key || templateStage?.phaseKey,
+      stepLabel: sr.step_label || templateStage?.label,
+    };
+  });
 
   return {
     id: row.id,
@@ -539,7 +557,7 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     templatePhases,
     status: row.status,
     currentStageIndex: row.current_stage_index,
-    stageRuns: stageRows.map(rowToStageRun),
+    stageRuns: enrichedStageRuns,
     createdAt: row.created_at,
     completedAt: row.completed_at,
   };
