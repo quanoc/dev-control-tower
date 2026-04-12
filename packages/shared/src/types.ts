@@ -230,6 +230,7 @@ export interface PipelineInstance {
   id: number;
   taskId: number;
   templateId: number | null;
+  templateName?: string;
   status: PipelineInstanceStatus;
   currentStageIndex: number;
   stageRuns: StageRun[];

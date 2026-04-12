@@ -518,10 +518,18 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     'SELECT * FROM pipeline_stage_runs WHERE instance_id = ? ORDER BY id'
   ).all(row.id) as any[];
 
+  // Get template name if template exists
+  let templateName: string | undefined;
+  if (row.template_id) {
+    const template = db.prepare('SELECT name FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string } | undefined;
+    templateName = template?.name;
+  }
+
   return {
     id: row.id,
     taskId: row.task_id,
     templateId: row.template_id,
+    templateName,
     status: row.status,
     currentStageIndex: row.current_stage_index,
     stageRuns: stageRows.map(rowToStageRun),

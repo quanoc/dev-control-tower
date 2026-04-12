@@ -203,6 +203,15 @@ function TaskRow({ task }: TaskRowProps) {
           <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
         </td>
 
+        {/* Pipeline Template */}
+        <td className="px-4 py-3 w-32">
+          {pipeline?.templateName ? (
+            <span className="text-xs text-blue-400">{pipeline.templateName}</span>
+          ) : (
+            <span className="text-xs text-gray-600">—</span>
+          )}
+        </td>
+
         {/* Current Stage */}
         <td className="px-4 py-3 w-36">
           <div className="flex flex-col gap-0.5">
@@ -310,6 +319,7 @@ export function TaskList() {
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-16">#</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500">需求</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-28">状态</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-32">流水线</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-36">当前阶段 / 进度</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-40">创建时间</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500">操作</th>
