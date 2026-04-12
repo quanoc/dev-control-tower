@@ -1,11 +1,12 @@
 import React from 'react';
-import type { StageRun } from '@pipeline/shared';
+import type { StageRun, PipelinePhase } from '@pipeline/shared';
 import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, PauseCircle } from 'lucide-react';
 import { PHASES } from '@pipeline/shared';
 
 interface PipelineFlowProps {
   stageRuns: StageRun[];
   currentStageIndex: number;
+  templatePhases?: PipelinePhase[];
   compact?: boolean;
 }
 
@@ -61,39 +62,53 @@ function getStatusIcon(status: string, label: string) {
   }
 }
 
-export function PipelineFlow({ stageRuns, currentStageIndex, compact = false }: PipelineFlowProps) {
+export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, compact = false }: PipelineFlowProps) {
   if (stageRuns.length === 0) {
     return <span className="text-sm text-gray-500">无流水线</span>;
   }
 
-  // Group stages by phase
-  const phaseMap = new Map<string, StageRun[]>();
-  for (const stage of stageRuns) {
-    const phaseKey = stage.phaseKey || 'other';
-    if (!phaseMap.has(phaseKey)) {
-      phaseMap.set(phaseKey, []);
-    }
-    phaseMap.get(phaseKey)!.push(stage);
-  }
+  // Create a map from stageKey to stageRun for quick lookup
+  const stageRunMap = new Map(stageRuns.map(sr => [sr.stageKey, sr]));
 
-  // Order phases: standard phases first, then others
-  const orderedPhases = PHASES.map(p => p.key).filter(k => phaseMap.has(k));
-  for (const phaseKey of phaseMap.keys()) {
-    if (!orderedPhases.includes(phaseKey)) {
-      orderedPhases.push(phaseKey);
-    }
-  }
+  // If templatePhases provided, use that structure
+  const displayPhases = templatePhases && templatePhases.length > 0
+    ? templatePhases
+    : // Otherwise, group stageRuns by phaseKey
+      (() => {
+        const phaseMap = new Map<string, StageRun[]>();
+        for (const stage of stageRuns) {
+          const phaseKey = stage.phaseKey || 'other';
+          if (!phaseMap.has(phaseKey)) {
+            phaseMap.set(phaseKey, []);
+          }
+          phaseMap.get(phaseKey)!.push(stage);
+        }
+        // Convert to PipelinePhase format
+        return Array.from(phaseMap.entries()).map(([phaseKey, steps]) => ({
+          phaseKey,
+          label: getPhaseLabel(phaseKey),
+          icon: '📌',
+          steps: steps.map(sr => ({
+            key: sr.stageKey,
+            label: sr.stepLabel || sr.stageKey,
+            actorType: 'agent' as const,
+            action: 'code' as const,
+            optional: false,
+            icon: '⚙️',
+            execution: 'serial' as const,
+          })),
+        }));
+      })();
 
   return (
     <div className={`overflow-x-auto ${compact ? 'scale-90 origin-left' : ''}`}>
       <div className="flex items-start gap-2 min-w-max">
-        {orderedPhases.map((phaseKey, phaseIdx) => {
-          const stages = phaseMap.get(phaseKey)!;
-          const colors = getPhaseColor(phaseKey);
-          const phaseLabel = getPhaseLabel(phaseKey);
+        {displayPhases.map((phase, phaseIdx) => {
+          const colors = getPhaseColor(phase.phaseKey);
+          const phaseLabel = phase.label || getPhaseLabel(phase.phaseKey);
 
           return (
-            <React.Fragment key={phaseKey}>
+            <React.Fragment key={phase.phaseKey}>
               {/* Phase column */}
               <div className="flex flex-col items-center">
                 {/* Phase header */}
@@ -103,24 +118,27 @@ export function PipelineFlow({ stageRuns, currentStageIndex, compact = false }: 
 
                 {/* Steps in this phase */}
                 <div className="flex flex-col items-center gap-1.5">
-                  {stages.map((stage) => {
-                    const label = stage.stepLabel || stage.stageKey;
+                  {phase.steps.map((step) => {
+                    const stageRun = stageRunMap.get(step.key);
+                    const status = stageRun?.status || 'pending';
+                    const label = step.label;
+
                     return (
                       <div
-                        key={stage.id}
+                        key={step.key}
                         className={`flex items-center gap-1.5 px-2 py-1 rounded border ${
-                          stage.status === 'running' ? 'bg-blue-500/20 border-blue-500/50' :
-                          stage.status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/50' :
-                          stage.status === 'failed' ? 'bg-red-500/20 border-red-500/50' :
+                          status === 'running' ? 'bg-blue-500/20 border-blue-500/50' :
+                          status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/50' :
+                          status === 'failed' ? 'bg-red-500/20 border-red-500/50' :
                           'bg-gray-800 border-gray-700'
                         }`}
-                        title={`${label}: ${stage.status}`}
+                        title={`${label}: ${status}`}
                       >
-                        {getStatusIcon(stage.status, label)}
+                        {getStatusIcon(status, label)}
                         <span className={`text-xs whitespace-nowrap ${
-                          stage.status === 'running' ? 'text-blue-400 font-medium' :
-                          stage.status === 'completed' ? 'text-emerald-400' :
-                          stage.status === 'failed' ? 'text-red-400' :
+                          status === 'running' ? 'text-blue-400 font-medium' :
+                          status === 'completed' ? 'text-emerald-400' :
+                          status === 'failed' ? 'text-red-400' :
                           'text-gray-400'
                         }`}>
                           {label}
@@ -132,7 +150,7 @@ export function PipelineFlow({ stageRuns, currentStageIndex, compact = false }: 
               </div>
 
               {/* Arrow to next phase */}
-              {phaseIdx < orderedPhases.length - 1 && (
+              {phaseIdx < displayPhases.length - 1 && (
                 <div className="flex items-start pt-4">
                   <ArrowRight className="w-4 h-4 text-gray-600" />
                 </div>

@@ -518,11 +518,17 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     'SELECT * FROM pipeline_stage_runs WHERE instance_id = ? ORDER BY id'
   ).all(row.id) as any[];
 
-  // Get template name if template exists
+  // Get template info if template exists
   let templateName: string | undefined;
+  let templatePhases: PipelinePhase[] | undefined;
   if (row.template_id) {
-    const template = db.prepare('SELECT name FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string } | undefined;
-    templateName = template?.name;
+    const template = db.prepare('SELECT name, phases FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string; phases: string } | undefined;
+    if (template) {
+      templateName = template.name;
+      if (template.phases) {
+        templatePhases = JSON.parse(template.phases);
+      }
+    }
   }
 
   return {
@@ -530,6 +536,7 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     taskId: row.task_id,
     templateId: row.template_id,
     templateName,
+    templatePhases,
     status: row.status,
     currentStageIndex: row.current_stage_index,
     stageRuns: stageRows.map(rowToStageRun),

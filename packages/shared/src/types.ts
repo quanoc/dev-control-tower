@@ -231,6 +231,7 @@ export interface PipelineInstance {
   taskId: number;
   templateId: number | null;
   templateName?: string;
+  templatePhases?: PipelinePhase[];
   status: PipelineInstanceStatus;
   currentStageIndex: number;
   stageRuns: StageRun[];

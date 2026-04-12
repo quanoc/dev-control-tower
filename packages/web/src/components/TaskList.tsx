@@ -68,7 +68,11 @@ function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
           <div className="mb-6">
             <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">流程总览</h4>
             <div className="flex items-center gap-2">
-              <PipelineFlow stageRuns={pipeline.stageRuns} currentStageIndex={pipeline.currentStageIndex} />
+              <PipelineFlow
+                stageRuns={pipeline.stageRuns}
+                currentStageIndex={pipeline.currentStageIndex}
+                templatePhases={pipeline.templatePhases}
+              />
             </div>
           </div>
 
