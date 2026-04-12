@@ -89,11 +89,22 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
     fetchAgents();
   }, [fetchAgents]);
 
+  // Role type abbreviations
+  const ROLE_TYPE: Record<string, string> = {
+    'xiaoxi-pm':      'PM',
+    'zhangjia-arch':  'AR',
+    'magerd':        'RD',
+    'xiaozhi-test':  'QA',
+    'xiaowen-docs':  'TW',
+    'xiaoyun-ops':   'OP',
+  };
+
   // Helper to get agent name from ID
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
-    if (!agent) return agentId;
-    return agent.role ? `${agent.name}(${agent.role})` : agent.name;
+    const roleAbbr = ROLE_TYPE[agentId] || '';
+    if (!agent) return roleAbbr ? `${agentId}(${roleAbbr})` : agentId;
+    return roleAbbr ? `${agent.name}(${roleAbbr})` : agent.name;
   };
 
   // Form state
