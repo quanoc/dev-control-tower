@@ -451,14 +451,19 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
               {/* Agent ID / Human Role */}
               {formData.actor_type === 'agent' && (
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Agent ID</label>
-                  <input
-                    type="text"
-                    value={formData.agent_id}
+                  <label className="text-xs text-gray-500 mb-1 block">Agent</label>
+                  <select
+                    value={formData.agent_id || ''}
                     onChange={e => setFormData({ ...formData, agent_id: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
-                    placeholder="例如：magerd"
-                  />
+                  >
+                    <option value="">选择 Agent</option>
+                    {agents.map(agent => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name}({ROLE_TYPE[agent.id] || agent.role || agent.id})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
