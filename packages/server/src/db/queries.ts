@@ -71,13 +71,19 @@ export function getAllTasks(status?: string): Task[] {
     params.push(status);
   }
   sql += ' ORDER BY created_at DESC';
-  return (db.prepare(sql).all(...params) as any[]).map(rowToTask);
+  const tasks = (db.prepare(sql).all(...params) as any[]).map(row => {
+    const pipeline = getPipelineInstanceByTaskId(row.id);
+    return rowToTask(row, pipeline);
+  });
+  return tasks;
 }
 
 export function getTaskById(id: number): Task | undefined {
   const db = getDb();
   const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
-  return row ? rowToTask(row) : undefined;
+  if (!row) return undefined;
+  const pipeline = getPipelineInstanceByTaskId(id);
+  return rowToTask(row, pipeline);
 }
 
 export function createTask(title: string, description: string, createdBy = 'human'): number {
@@ -456,7 +462,7 @@ function rowToAgent(row: any): Agent {
   };
 }
 
-function rowToTask(row: any): Task {
+function rowToTask(row: any, pipeline?: PipelineInstance | undefined): Task {
   return {
     id: row.id,
     title: row.title,
@@ -466,7 +472,7 @@ function rowToTask(row: any): Task {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
-    pipeline: null,
+    pipeline: pipeline || null,
   };
 }
 

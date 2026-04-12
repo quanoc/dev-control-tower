@@ -241,16 +241,19 @@ function TaskRow({ task }: TaskRowProps) {
             >
               <Eye className="w-3.5 h-3.5" />
             </button>
-            {pipeline && (
-              <button
-                onClick={() => setShowPipeline(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-gray-400 hover:text-blue-400 hover:bg-gray-800 rounded text-xs transition-colors"
-                title="查看流水线"
-              >
-                <GitBranch className="w-3.5 h-3.5" />
-                流水线
-              </button>
-            )}
+            <button
+              onClick={() => setShowPipeline(true)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs transition-colors ${
+                pipeline
+                  ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-500 cursor-not-allowed'
+              }`}
+              title={pipeline ? "查看流水线" : "需要先启动流水线"}
+              disabled={!pipeline}
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              流水线
+            </button>
           </div>
         </td>
       </tr>
