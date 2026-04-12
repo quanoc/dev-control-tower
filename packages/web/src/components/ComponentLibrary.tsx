@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Trash2, Edit2, X, Grid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../api/client';
+import { useAgentStore } from '../store/agents';
 
 interface Component {
   id: number;
@@ -78,6 +79,21 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Get agents for name lookup
+  const agents = useAgentStore(s => s.agents);
+  const fetchAgents = useAgentStore(s => s.fetchAgents);
+
+  // Fetch agents on mount
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
+
+  // Helper to get agent name from ID
+  const getAgentName = (agentId: string) => {
+    const agent = agents.find(a => a.id === agentId);
+    return agent?.name || agentId;
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -269,7 +285,7 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
                       <div>
                         <h3 className="text-sm font-medium text-gray-200">{comp.name}</h3>
                         <p className="text-xs text-gray-500">
-                          {comp.actor_type === 'agent' && comp.agent_id ? `Agent: ${comp.agent_id}` :
+                          {comp.actor_type === 'agent' && comp.agent_id ? `Agent: ${getAgentName(comp.agent_id)}` :
                            comp.actor_type === 'human' && comp.human_role ? `角色: ${comp.human_role}` :
                            actionDef?.label}
                         </p>
