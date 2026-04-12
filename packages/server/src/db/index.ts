@@ -34,6 +34,21 @@ export function getDb(): Database.Database {
         "ALTER TABLE pipeline_templates ADD COLUMN phases TEXT"
       );
     }
+
+    // Migrate pipeline_stage_runs table
+    const stageRunsColumns = db.prepare(
+      "PRAGMA table_info(pipeline_stage_runs)"
+    ).all() as any[];
+    if (!stageRunsColumns.some(c => c.name === 'phase_key')) {
+      db.exec(
+        "ALTER TABLE pipeline_stage_runs ADD COLUMN phase_key TEXT"
+      );
+    }
+    if (!stageRunsColumns.some(c => c.name === 'step_label')) {
+      db.exec(
+        "ALTER TABLE pipeline_stage_runs ADD COLUMN step_label TEXT"
+      );
+    }
   }
   return db;
 }

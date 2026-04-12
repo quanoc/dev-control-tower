@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS pipeline_stage_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     instance_id INTEGER NOT NULL REFERENCES pipeline_instances(id),
     stage_key TEXT NOT NULL,
+    phase_key TEXT,
+    step_label TEXT,
     agent_id TEXT NOT NULL,
     status TEXT DEFAULT 'pending',
     input TEXT,

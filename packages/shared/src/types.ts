@@ -241,6 +241,8 @@ export interface StageRun {
   id: number;
   instanceId: number;
   stageKey: string;
+  phaseKey?: string;
+  stepLabel?: string;
   agentId: string;
   status: StageRunStatus;
   input: string | null;

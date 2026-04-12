@@ -342,12 +342,12 @@ export function createPipelineInstance(taskId: number, templateId: number | null
     const instanceId = instanceResult.lastInsertRowid as number;
 
     const insertStage = db.prepare(
-      'INSERT INTO pipeline_stage_runs (instance_id, stage_key, agent_id) VALUES (?, ?, ?)'
+      'INSERT INTO pipeline_stage_runs (instance_id, stage_key, phase_key, step_label, agent_id) VALUES (?, ?, ?, ?, ?)'
     );
     for (const stage of stages) {
       // Provide default agent_id for human/system stages
       const agentId = stage.agentId || stage.humanRole || stage.action || 'system';
-      insertStage.run(instanceId, stage.key, agentId);
+      insertStage.run(instanceId, stage.key, stage.phaseKey, stage.label, agentId);
     }
 
     return instanceId;
@@ -535,6 +535,8 @@ function rowToStageRun(row: any): StageRun {
     id: row.id,
     instanceId: row.instance_id,
     stageKey: row.stage_key,
+    phaseKey: row.phase_key,
+    stepLabel: row.step_label,
     agentId: row.agent_id,
     status: row.status,
     input: row.input,

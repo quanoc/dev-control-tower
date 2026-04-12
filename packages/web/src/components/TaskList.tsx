@@ -21,6 +21,14 @@ const STAGE_LABELS: Record<string, string> = {
   deployment:     '部署上线',
 };
 
+const PHASE_LABELS: Record<string, string> = {
+  requirements:  '需求阶段',
+  design:        '设计阶段',
+  development:   '开发阶段',
+  testing:       '测试阶段',
+  deployment:    '上线阶段',
+};
+
 function getCurrentStage(pipeline: PipelineInstance | null): { label: string; progress: string } {
   if (!pipeline) return { label: '—', progress: '' };
   if (pipeline.status === 'completed') return { label: '全部完成', progress: `${pipeline.stageRuns.length}/${pipeline.stageRuns.length}` };
@@ -71,11 +79,12 @@ function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-900 border-b border-gray-800">
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-16">#</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium">阶段</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-24">Agent</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-20">状态</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-24">耗时</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-12">#</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-20">阶段</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium">步骤</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-20">执行者</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-16">状态</th>
+                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-16">耗时</th>
                     <th className="text-left px-4 py-2.5 text-gray-500 font-medium">输出</th>
                   </tr>
                 </thead>
@@ -103,7 +112,8 @@ const STAGE_STATUS_MAP: Record<string, { label: string; bg: string; text: string
 
 function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; onRetry?: (id: number) => void }) {
   const status = STAGE_STATUS_MAP[stage.status] || STAGE_STATUS_MAP.pending;
-  const label = STAGE_LABELS[stage.stageKey] || stage.stageKey;
+  const stepLabel = stage.stepLabel || stage.stageKey;
+  const phaseLabel = stage.phaseKey ? (PHASE_LABELS[stage.phaseKey] || stage.phaseKey) : '—';
 
   let duration = '—';
   if (stage.startedAt && stage.completedAt) {
@@ -116,8 +126,9 @@ function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; o
   return (
     <tr className="border-b border-gray-800/50 hover:bg-gray-800/30">
       <td className="px-4 py-3 text-gray-600 font-mono">{index + 1}</td>
-      <td className="px-4 py-3 text-gray-300">{label}</td>
-      <td className="px-4 py-3 text-gray-500">{stage.agentId}</td>
+      <td className="px-4 py-3 text-gray-400">{phaseLabel}</td>
+      <td className="px-4 py-3 text-gray-300">{stepLabel}</td>
+      <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex px-2 py-0.5 rounded text-[10px] ${status.bg} ${status.text}`}>
           {status.label}
