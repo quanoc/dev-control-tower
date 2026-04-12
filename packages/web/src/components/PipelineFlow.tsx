@@ -1,6 +1,6 @@
 import React from 'react';
 import type { StageRun } from '@pipeline/shared';
-import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, ArrowDown, PauseCircle } from 'lucide-react';
+import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, PauseCircle } from 'lucide-react';
 import { PHASES } from '@pipeline/shared';
 
 interface PipelineFlowProps {
@@ -85,46 +85,62 @@ export function PipelineFlow({ stageRuns, currentStageIndex, compact = false }: 
   }
 
   return (
-    <div className={`flex flex-col gap-3 ${compact ? 'scale-90 origin-left' : ''}`}>
-      {orderedPhases.map((phaseKey, phaseIdx) => {
-        const stages = phaseMap.get(phaseKey)!;
-        const colors = getPhaseColor(phaseKey);
-        const phaseLabel = getPhaseLabel(phaseKey);
+    <div className={`overflow-x-auto ${compact ? 'scale-90 origin-left' : ''}`}>
+      <div className="flex items-start gap-2 min-w-max">
+        {orderedPhases.map((phaseKey, phaseIdx) => {
+          const stages = phaseMap.get(phaseKey)!;
+          const colors = getPhaseColor(phaseKey);
+          const phaseLabel = getPhaseLabel(phaseKey);
 
-        return (
-          <div key={phaseKey} className="flex items-center gap-2">
-            {/* Phase header */}
-            <div className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg border ${colors.bg} ${colors.border} ${colors.text} text-xs font-medium`}>
-              {phaseLabel}
-            </div>
+          return (
+            <React.Fragment key={phaseKey}>
+              {/* Phase column */}
+              <div className="flex flex-col items-center">
+                {/* Phase header */}
+                <div className={`flex-shrink-0 px-3 py-1.5 rounded-lg border mb-2 ${colors.bg} ${colors.border} ${colors.text} text-xs font-medium`}>
+                  {phaseLabel}
+                </div>
 
-            {/* Steps in this phase */}
-            <div className="flex items-center gap-1">
-              {stages.map((stage, stepIdx) => {
-                const label = stage.stepLabel || stage.stageKey;
-                return (
-                  <React.Fragment key={stage.id}>
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(stage.status, label)}
-                      <span className={`text-xs ${stage.status === 'running' ? 'text-blue-400 font-medium' : stage.status === 'completed' ? 'text-emerald-400' : stage.status === 'failed' ? 'text-red-400' : 'text-gray-500'}`}>
-                        {label}
-                      </span>
-                    </div>
-                    {stepIdx < stages.length - 1 && (
-                      <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
+                {/* Steps in this phase */}
+                <div className="flex flex-col items-center gap-1.5">
+                  {stages.map((stage) => {
+                    const label = stage.stepLabel || stage.stageKey;
+                    return (
+                      <div
+                        key={stage.id}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded border ${
+                          stage.status === 'running' ? 'bg-blue-500/20 border-blue-500/50' :
+                          stage.status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/50' :
+                          stage.status === 'failed' ? 'bg-red-500/20 border-red-500/50' :
+                          'bg-gray-800 border-gray-700'
+                        }`}
+                        title={`${label}: ${stage.status}`}
+                      >
+                        {getStatusIcon(stage.status, label)}
+                        <span className={`text-xs whitespace-nowrap ${
+                          stage.status === 'running' ? 'text-blue-400 font-medium' :
+                          stage.status === 'completed' ? 'text-emerald-400' :
+                          stage.status === 'failed' ? 'text-red-400' :
+                          'text-gray-400'
+                        }`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* Arrow to next phase */}
-            {phaseIdx < orderedPhases.length - 1 && (
-              <ArrowDown className="w-3 h-3 text-gray-600 flex-shrink-0 ml-2" />
-            )}
-          </div>
-        );
-      })}
+              {/* Arrow to next phase */}
+              {phaseIdx < orderedPhases.length - 1 && (
+                <div className="flex items-start pt-4">
+                  <ArrowRight className="w-4 h-4 text-gray-600" />
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
