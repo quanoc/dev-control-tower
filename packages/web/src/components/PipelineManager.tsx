@@ -258,7 +258,7 @@ export function PipelineManager() {
                   <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-16">#</th>
                   <th className="px-4 py-2.5 text-xs font-medium text-gray-500">模板名称</th>
                   <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-28">复杂度</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-40">阶段 / 步骤</th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-56">阶段 / 步骤</th>
                   <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-40">创建时间</th>
                   <th className="px-4 py-2.5 text-xs font-medium text-gray-500">操作</th>
                 </tr>
