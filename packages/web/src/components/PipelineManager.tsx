@@ -241,9 +241,11 @@ export function PipelineManager() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView('components')}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+              view === 'components' ? 'text-white' : 'text-gray-400 hover:text-white'
+            }`}
           >
-            组件库
+            流水线组件
           </button>
           <button
             onClick={() => setShowForm(true)}

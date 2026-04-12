@@ -193,10 +193,10 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
               onClick={onBack}
               className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
             >
-              ← 返回
+              ← 模板
             </button>
           )}
-          <h2 className="text-lg font-semibold text-gray-200">流水线组件库</h2>
+          <h2 className="text-lg font-semibold text-gray-200">流水线组件</h2>
         </div>
         <button
           onClick={openNewForm}
