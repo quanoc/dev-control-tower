@@ -268,7 +268,11 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
                       <span className="text-xl">{actionDef?.icon || '⚙️'}</span>
                       <div>
                         <h3 className="text-sm font-medium text-gray-200">{comp.name}</h3>
-                        <p className="text-xs text-gray-500">{actionDef?.label}</p>
+                        <p className="text-xs text-gray-500">
+                          {comp.actor_type === 'agent' && comp.agent_id ? `Agent: ${comp.agent_id}` :
+                           comp.actor_type === 'human' && comp.human_role ? `角色: ${comp.human_role}` :
+                           actionDef?.label}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
