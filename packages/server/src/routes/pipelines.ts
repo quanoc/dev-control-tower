@@ -129,4 +129,103 @@ router.delete('/components/:id', (req, res) => {
   res.status(204).send();
 });
 
+// POST /api/pipelines/components/generate-from-templates - Generate components from template steps
+router.post('/components/generate-from-templates', (_req, res) => {
+  const templates = queries.getAllTemplates();
+
+  // Step 1: Collect unique step definitions from all templates
+  const stepKeyMap = new Map<string, { step: any; phaseKey: string }>();
+
+  for (const tmpl of templates) {
+    for (const phase of tmpl.phases) {
+      for (const step of phase.steps) {
+        // Create a unique key based on step properties
+        const key = [
+          step.actorType,
+          step.action,
+          step.agentId || '',
+          step.humanRole || '',
+          step.optional ? 'optional' : 'required',
+          step.execution,
+        ].join('|');
+
+        if (!stepKeyMap.has(key)) {
+          stepKeyMap.set(key, { step, phaseKey: phase.phaseKey });
+        }
+      }
+    }
+  }
+
+  // Step 2: Create components for unique steps
+  const componentIdMap = new Map<string, number>();
+
+  for (const [key, { step }] of stepKeyMap) {
+    // Check if similar component already exists
+    const existingComponents = queries.listComponents({ search: step.label, page: 1, limit: 100 });
+    const existing = existingComponents.items.find(c =>
+      c.actor_type === step.actorType &&
+      c.action === step.action &&
+      c.agent_id === step.agentId &&
+      c.human_role === step.humanRole
+    );
+
+    if (existing) {
+      componentIdMap.set(key, existing.id);
+    } else {
+      // Create new component
+      const icon = step.icon || '⚙️';
+      const componentId = queries.createComponent({
+        name: step.label,
+        description: `${step.label} - ${step.action}`,
+        actor_type: step.actorType,
+        action: step.action,
+        agent_id: step.agentId || null,
+        human_role: step.humanRole || null,
+        icon,
+        execution: step.execution,
+        optional: step.optional,
+      });
+      componentIdMap.set(key, componentId);
+    }
+  }
+
+  // Step 3: Update templates with componentId references
+  let templatesUpdated = 0;
+
+  for (const tmpl of templates) {
+    const updatedPhases = tmpl.phases.map(phase => ({
+      ...phase,
+      steps: phase.steps.map(step => {
+        const key = [
+          step.actorType,
+          step.action,
+          step.agentId || '',
+          step.humanRole || '',
+          step.optional ? 'optional' : 'required',
+          step.execution,
+        ].join('|');
+
+        const componentId = componentIdMap.get(key);
+        return { ...step, componentId };
+      }),
+    }));
+
+    // Only update if phases changed (componentId was added)
+    const hasChanges = updatedPhases.some((phase, pi) =>
+      phase.steps.some((step, si) => !tmpl.phases[pi]?.steps[si]?.componentId)
+    );
+
+    if (hasChanges) {
+      queries.updateTemplate(tmpl.id, tmpl.name, tmpl.description, updatedPhases, tmpl.complexity);
+      templatesUpdated++;
+    }
+  }
+
+  res.json({
+    success: true,
+    componentsCreated: componentIdMap.size,
+    templatesUpdated,
+  });
+});
+
 export default router;

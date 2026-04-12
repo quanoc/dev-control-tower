@@ -123,6 +123,7 @@ export type ExecutionMode = 'serial' | 'parallel';
 /**
  * PipelineStep = a single executable unit within a phase.
  * Each step is performed by an actor (agent, human, or system).
+ * Step can optionally reference a reusable pipeline component.
  */
 export interface PipelineStep {
   key: string;
@@ -135,6 +136,8 @@ export interface PipelineStep {
   icon: string;
   /** How this step executes relative to siblings in the same phase */
   execution: ExecutionMode;
+  /** Optional reference to a reusable pipeline component */
+  componentId?: number;
 }
 
 // ─── Pipeline Phase (Level 1 container) ────────────────────────

@@ -112,6 +112,11 @@ export const api = {
     }),
     deleteComponent: (id: number) =>
       request<void>(`/pipelines/components/${id}`, { method: 'DELETE' }),
+    generateFromTemplates: () =>
+      request<{ success: boolean; componentsCreated: number; templatesUpdated: number }>(
+        '/pipelines/components/generate-from-templates',
+        { method: 'POST' }
+      ),
     listInstances: () => request<PipelineInstance[]>('/pipelines/instances'),
     createInstance: (taskId: number, templateId: number) =>
       request<any>('/pipelines/instances', {
