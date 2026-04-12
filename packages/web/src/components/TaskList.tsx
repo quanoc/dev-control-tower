@@ -79,17 +79,17 @@ function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
           {/* Stage detail table */}
           <div>
             <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
-            <div className="overflow-hidden rounded-lg border border-gray-800">
-              <table className="w-full text-xs">
+            <div className="overflow-x-auto rounded-lg border border-gray-800">
+              <table className="w-full text-xs whitespace-nowrap">
                 <thead>
                   <tr className="bg-gray-900 border-b border-gray-800">
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-12">#</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-20">阶段</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium">步骤</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-20">执行者</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-16">状态</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium w-16">耗时</th>
-                    <th className="text-left px-4 py-2.5 text-gray-500 font-medium">输出</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-8">#</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-16">阶段</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium">步骤</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">执行者</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">状态</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">耗时</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-48">输出</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -129,20 +129,20 @@ function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; o
 
   return (
     <tr className="border-b border-gray-800/50 hover:bg-gray-800/30">
-      <td className="px-4 py-3 text-gray-600 font-mono">{index + 1}</td>
-      <td className="px-4 py-3 text-gray-400">{phaseLabel}</td>
-      <td className="px-4 py-3 text-gray-300">{stepLabel}</td>
-      <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2.5 text-gray-600 font-mono">{index + 1}</td>
+      <td className="px-3 py-2.5 text-gray-400">{phaseLabel}</td>
+      <td className="px-3 py-2.5 text-gray-300">{stepLabel}</td>
+      <td className="px-3 py-2.5 text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
+      <td className="px-3 py-2.5">
         <span className={`inline-flex px-2 py-0.5 rounded text-[10px] ${status.bg} ${status.text}`}>
           {status.label}
         </span>
       </td>
-      <td className="px-4 py-3 text-gray-500 font-mono">{duration}</td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2.5 text-gray-500 font-mono">{duration}</td>
+      <td className="px-3 py-2.5">
         {stage.error ? (
           <div className="flex items-center gap-2">
-            <span className="text-red-400 truncate max-w-[300px]">{stage.error.substring(0, 80)}</span>
+            <span className="text-red-400 truncate">{stage.error.substring(0, 60)}</span>
             {onRetry && (
               <button
                 onClick={() => onRetry(stage.id)}
@@ -153,7 +153,7 @@ function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; o
             )}
           </div>
         ) : stage.output ? (
-          <span className="text-gray-400 truncate max-w-[300px]">{stage.output.substring(0, 80)}</span>
+          <span className="text-gray-400 truncate">{stage.output.substring(0, 60)}</span>
         ) : (
           <span className="text-gray-700">—</span>
         )}
