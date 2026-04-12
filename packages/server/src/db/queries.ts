@@ -94,6 +94,18 @@ export function createTask(title: string, description: string, createdBy = 'huma
   return result.lastInsertRowid as number;
 }
 
+export function deleteTask(id: number): void {
+  const db = getDb();
+  // First delete pipeline instance and stage runs
+  const instance = db.prepare('SELECT id FROM pipeline_instances WHERE task_id = ?').get(id) as { id: number } | undefined;
+  if (instance) {
+    db.prepare('DELETE FROM pipeline_stage_runs WHERE instance_id = ?').run(instance.id);
+    db.prepare('DELETE FROM pipeline_instances WHERE id = ?').run(instance.id);
+  }
+  // Then delete the task
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+}
+
 export function updateTaskStatus(id: number, status: string): void {
   const db = getDb();
   const completedAt = status === 'completed' || status === 'failed' || status === 'cancelled'

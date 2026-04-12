@@ -90,4 +90,15 @@ router.post('/:id/pipeline/retry', async (req, res) => {
   }
 });
 
+// DELETE /api/tasks/:id - Delete a task
+router.delete('/:id', (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    queries.deleteTask(id);
+    res.status(204).send();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
