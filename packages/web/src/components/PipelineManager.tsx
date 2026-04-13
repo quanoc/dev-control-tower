@@ -57,6 +57,8 @@ export function PipelineManager() {
   const [selectedStep, setSelectedStep] = useState<{ phaseKey: string; stepIndex: number } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showAddPhaseDialog, setShowAddPhaseDialog] = useState(false);
+  const [editingPhaseKey, setEditingPhaseKey] = useState<string | null>(null);
+  const [editingPhaseName, setEditingPhaseName] = useState('');
   const [addPhaseAfterKey, setAddPhaseAfterKey] = useState<string | null>(null);
   const [newPhaseName, setNewPhaseName] = useState('');
   const [pickerPhase, setPickerPhase] = useState<PhaseKey | null>(null);
@@ -213,6 +215,35 @@ export function PipelineManager() {
     setShowAddPhaseDialog(false);
     setAddPhaseAfterKey(null);
     setNewPhaseName('');
+  };
+
+  // Edit phase handlers
+  const handleEditPhase = (phaseKey: string) => {
+    const phase = formData.phases.find(p => p.phaseKey === phaseKey);
+    if (phase) {
+      setEditingPhaseKey(phaseKey);
+      setEditingPhaseName(phase.label);
+    }
+  };
+
+  const confirmEditPhase = () => {
+    if (!editingPhaseKey || !editingPhaseName.trim()) {
+      setEditingPhaseKey(null);
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      phases: prev.phases.map(p =>
+        p.phaseKey === editingPhaseKey ? { ...p, label: editingPhaseName.trim() } : p
+      ),
+    }));
+    setEditingPhaseKey(null);
+    setEditingPhaseName('');
+  };
+
+  const cancelEditPhase = () => {
+    setEditingPhaseKey(null);
+    setEditingPhaseName('');
   };
 
   if (loading) {
@@ -408,7 +439,7 @@ export function PipelineManager() {
 
               {/* Pipeline Preview */}
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">流水线预览 · 点击阶段添加步骤，点击步骤编辑</label>
+                <label className="text-xs text-gray-500 mb-1 block">流水线预览 · 点击阶段修改名称，点击步骤编辑</label>
                 <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
                   <PipelinePreview
                     phases={formData.phases}
@@ -417,6 +448,7 @@ export function PipelineManager() {
                     onSelectStep={(pk, si) => { setSelectedStep({ phaseKey: pk, stepIndex: si }); setShowPicker(false); }}
                     onRemoveStep={removeStep}
                     onAddStepToPhase={(pk) => { setShowPicker(true); setPickerPhase(pk as PhaseKey); setSelectedStep(null); }}
+                    onEditPhase={handleEditPhase}
                     onRemoveCustomPhase={(pk) => setFormData(prev => ({ ...prev, phases: prev.phases.filter(p => p.phaseKey !== pk) }))}
                     onDragStart={handleDragStart}
                     onDragOver={handleDragOver}
@@ -476,6 +508,40 @@ export function PipelineManager() {
                         className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
                       >
                         添加
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Edit Phase Dialog */}
+              {editingPhaseKey && (
+                <>
+                  <div className="fixed inset-0 bg-black/40 z-50" onClick={cancelEditPhase} />
+                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-xl p-5 z-[60] w-80 shadow-2xl">
+                    <h4 className="text-sm font-medium text-gray-200 mb-3">编辑阶段名称</h4>
+                    <input
+                      type="text"
+                      value={editingPhaseName}
+                      onChange={e => setEditingPhaseName(e.target.value)}
+                      placeholder="输入阶段名称"
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 mb-3"
+                      autoFocus
+                      onKeyDown={e => e.key === 'Enter' && confirmEditPhase()}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={cancelEditPhase}
+                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={confirmEditPhase}
+                        disabled={!editingPhaseName.trim()}
+                        className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+                      >
+                        保存
                       </button>
                     </div>
                   </div>

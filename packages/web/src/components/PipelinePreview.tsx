@@ -60,6 +60,7 @@ interface PipelinePreviewProps {
   onSelectStep: (phaseKey: string, stepIndex: number) => void;
   onRemoveStep: (phaseKey: string, stepIndex: number) => void;
   onAddStepToPhase: (phaseKey: string) => void;
+  onEditPhase?: (phaseKey: string) => void;
   onDragStart: (phaseKey: string, stepIndex: number) => void;
   onDragOver: (e: React.DragEvent, phaseKey: string, stepIndex: number) => void;
   onDragEnd: () => void;
@@ -71,6 +72,7 @@ interface PipelinePreviewProps {
 export function PipelinePreview({
   phases, selectedPhase, selectedStep,
   onSelectStep, onRemoveStep, onAddStepToPhase,
+  onEditPhase,
   onDragStart, onDragOver, onDragEnd,
   onAddCustomPhase, onRemoveCustomPhase, onAddPhaseAfter,
 }: PipelinePreviewProps) {
@@ -90,7 +92,7 @@ export function PipelinePreview({
         <div className="w-full flex items-center justify-between px-2 py-2 rounded-lg border-2 transition-colors mb-2 group/phase">
           <button
             type="button"
-            onClick={() => onAddStepToPhase(phaseKey)}
+            onClick={() => onEditPhase?.(phaseKey)}
             className={`flex items-center gap-2 flex-1 min-w-0 ${
               isActive
                 ? `border-solid ${colors.border} ${colors.bg}`
