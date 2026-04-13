@@ -74,7 +74,8 @@ export type SystemFlowType =
   | 'lint'          // 代码检查
   | 'build'         // 构建编译
   | 'security_scan' // 安全扫描
-  | 'test_e2e';     // E2E 测试
+  | 'test_e2e'      // E2E 测试
+  | 'code_pull';    // 代码拉取
 
 /** Project complexity levels */
 export type PipelineComplexity = 'small' | 'medium' | 'large';
@@ -342,6 +343,7 @@ export const SYSTEM_FLOWS: StageActionDef[] = [
   { key: 'build',         label: '构建编译',   icon: '⚙️', description: '编译和构建流程',     defaultPhase: 'testing' },
   { key: 'security_scan', label: '安全扫描',   icon: '🔒', description: '安全漏洞扫描',       defaultPhase: 'testing' },
   { key: 'test_e2e',      label: 'E2E 测试',   icon: '🖥️', description: '端到端自动化测试',   defaultPhase: 'testing' },
+  { key: 'code_pull',     label: '代码拉取',   icon: '📥', description: '从仓库拉取代码',     defaultPhase: 'development' },
 ];
 
 export function actionToActorType(action: string): ActorType {
