@@ -22,6 +22,21 @@ export const api = {
   agents: {
     list: () => request<Agent[]>('/agents'),
     getById: (id: string) => request<Agent>(`/agents/${id}`),
+    listClaude: () => request<any[]>('/agents/claude'),
+    listOpenclaw: () => request<any[]>('/agents/openclaw'),
+    sync: () => request<{ success: boolean; count: number; agents: Agent[] }>('/agents/sync', { method: 'POST' }),
+    create: (data: Partial<Agent> & { name: string; role: string }) =>
+      request<Agent>('/agents', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<Agent>) =>
+      request<Agent>(`/agents/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<void>(`/agents/${id}`, { method: 'DELETE' }),
     sendCommand: (id: string, message: string) =>
       request<any>(`/agents/${id}/command`, {
         method: 'POST',

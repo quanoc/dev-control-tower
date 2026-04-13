@@ -1,8 +1,9 @@
 import { OpenClawAgentClient } from '../openclaw/agent.js';
+import { ClaudeAgentClient } from '../openclaw/claude-agent.js';
 import type { AgentResponse } from '../openclaw/agent.js';
 import { stateMachine } from './statemachine.js';
 import * as queries from '../db/queries.js';
-import type { PipelineStage, PipelineInstance, StageRun, PipelinePhase } from '@pipeline/shared';
+import type { PipelineStage, PipelineInstance, StageRun, PipelinePhase, Agent } from '@pipeline/shared';
 import { DEFAULT_PIPELINE_STAGES, PHASES } from '@pipeline/shared';
 
 interface StageMeta {
@@ -11,6 +12,10 @@ interface StageMeta {
   phaseKey: string;
   execution: 'serial' | 'parallel';
   agentId: string;
+  agentSource?: string;
+  agentModel?: string;
+  agentSystemPrompt?: string;
+  agentTools?: string[];
 }
 
 /**
@@ -19,8 +24,38 @@ interface StageMeta {
  * Phases execute serially; within a phase, steps can be serial or parallel.
  */
 export class PipelineExecutor {
-  private agentClient = new OpenClawAgentClient();
+  private openclawClient = new OpenClawAgentClient();
+  private claudeClient = new ClaudeAgentClient();
   private running = new Map<number, boolean>();
+
+  /**
+   * Get the appropriate client based on agent source.
+   */
+  private getClientForAgent(agentId: string): { client: OpenClawAgentClient | ClaudeAgentClient; source: string } {
+    // Look up the agent in the database to get its source
+    const agent = queries.getAgentById(agentId);
+    const source = agent?.source || 'openclaw';
+
+    if (source === 'claude' || source === 'custom') {
+      return { client: this.claudeClient, source };
+    }
+
+    return { client: this.openclawClient, source: 'openclaw' };
+  }
+
+  /**
+   * Get agent config for Claude/custom agents.
+   */
+  private getAgentConfig(agentId: string): { model?: string; systemPrompt?: string; tools?: string[] } {
+    const agent = queries.getAgentById(agentId);
+    if (!agent) return {};
+
+    return {
+      model: agent.model,
+      systemPrompt: agent.systemPrompt,
+      tools: agent.tools,
+    };
+  }
 
   /**
    * Start executing a pipeline instance.
@@ -162,7 +197,18 @@ export class PipelineExecutor {
 
     console.log(`[Executor] Running stage "${meta.label}" (${meta.phaseKey}) with agent "${stageRun.agentId}"`);
 
-    const result = await this.agentClient.sendMessage(stageRun.agentId, input);
+    // Get the appropriate client based on agent source
+    const { client, source } = this.getClientForAgent(stageRun.agentId);
+    const agentConfig = this.getAgentConfig(stageRun.agentId);
+
+    let result: AgentResponse;
+    if (source === 'claude' || source === 'custom') {
+      // Use Claude client with config
+      result = await (client as ClaudeAgentClient).sendMessage(stageRun.agentId, input, agentConfig);
+    } else {
+      // Use OpenClaw client
+      result = await (client as OpenClawAgentClient).sendMessage(stageRun.agentId, input);
+    }
 
     if (result.success) {
       queries.setStageRunOutput(stageRun.id, result.output);
@@ -205,7 +251,17 @@ export class PipelineExecutor {
       batch.map(async (meta): Promise<AgentResponse> => {
         const sr = stageRuns.find(s => s.stageKey === meta.stageKey);
         if (!sr) return { success: true, output: '', error: undefined, duration: 0 };
-        return this.agentClient.sendMessage(sr.agentId, this.buildAgentInput(sr.stageKey, meta, instance));
+
+        // Get the appropriate client based on agent source
+        const { client, source } = this.getClientForAgent(sr.agentId);
+        const agentConfig = this.getAgentConfig(sr.agentId);
+        const input = this.buildAgentInput(sr.stageKey, meta, instance);
+
+        if (source === 'claude' || source === 'custom') {
+          return (client as ClaudeAgentClient).sendMessage(sr.agentId, input, agentConfig);
+        } else {
+          return (client as OpenClawAgentClient).sendMessage(sr.agentId, input);
+        }
       })
     );
 

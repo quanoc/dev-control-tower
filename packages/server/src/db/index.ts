@@ -49,6 +49,50 @@ export function getDb(): Database.Database {
         "ALTER TABLE pipeline_stage_runs ADD COLUMN step_label TEXT"
       );
     }
+
+    // Migrate agents table for multi-agent support
+    const agentsColumns = db.prepare(
+      "PRAGMA table_info(agents)"
+    ).all() as any[];
+
+    // Add 'type' column if missing (replacing 'source')
+    if (!agentsColumns.some(c => c.name === 'type')) {
+      const hasSource = agentsColumns.some(c => c.name === 'source');
+      if (!hasSource) {
+        db.exec("ALTER TABLE agents ADD COLUMN type TEXT DEFAULT 'openclaw'");
+      }
+    }
+
+    // Add metadata, last_sync, created_at columns (without default values for SQLite compatibility)
+    if (!agentsColumns.some(c => c.name === 'metadata')) {
+      db.exec("ALTER TABLE agents ADD COLUMN metadata TEXT");
+    }
+    if (!agentsColumns.some(c => c.name === 'last_sync')) {
+      db.exec("ALTER TABLE agents ADD COLUMN last_sync TEXT");
+    }
+    if (!agentsColumns.some(c => c.name === 'created_at')) {
+      db.exec("ALTER TABLE agents ADD COLUMN created_at TEXT");
+    }
+
+    // Legacy columns (keep for backward compatibility)
+    if (!agentsColumns.some(c => c.name === 'source')) {
+      db.exec("ALTER TABLE agents ADD COLUMN source TEXT DEFAULT 'openclaw'");
+    }
+    if (!agentsColumns.some(c => c.name === 'model')) {
+      db.exec("ALTER TABLE agents ADD COLUMN model TEXT");
+    }
+    if (!agentsColumns.some(c => c.name === 'system_prompt')) {
+      db.exec("ALTER TABLE agents ADD COLUMN system_prompt TEXT");
+    }
+    if (!agentsColumns.some(c => c.name === 'tools')) {
+      db.exec("ALTER TABLE agents ADD COLUMN tools TEXT DEFAULT '[]'");
+    }
+    if (!agentsColumns.some(c => c.name === 'icon')) {
+      db.exec("ALTER TABLE agents ADD COLUMN icon TEXT");
+    }
+    if (!agentsColumns.some(c => c.name === 'path')) {
+      db.exec("ALTER TABLE agents ADD COLUMN path TEXT");
+    }
   }
   return db;
 }

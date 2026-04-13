@@ -4,6 +4,8 @@
 // ─── Agent Types ───────────────────────────────────────────────
 
 export type AgentStatus = 'idle' | 'busy' | 'error' | 'offline';
+export type AgentSource = 'openclaw' | 'claude' | 'custom';
+export type AgentModel = 'sonnet' | 'opus' | 'haiku';
 
 export interface Agent {
   id: string;
@@ -17,6 +19,12 @@ export interface Agent {
   status: AgentStatus;
   currentTaskId: number | null;
   updatedAt: string;
+  // Extended fields for multi-agent support
+  source?: AgentSource;
+  model?: AgentModel;
+  systemPrompt?: string;
+  tools?: string[];
+  icon?: string;
 }
 
 export interface SkillEntry {

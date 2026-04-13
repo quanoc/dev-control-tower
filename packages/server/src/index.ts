@@ -46,8 +46,8 @@ app.get('/api/agents/:id/identity', (req, res) => {
   }
 });
 
-// Sync agents from OpenClaw config
-function syncAgentsFromOpenClaw(): void {
+// Sync agents from OpenClaw and Claude
+async function syncAllAgents(): Promise<void> {
   try {
     const config = JSON.parse(readFileSync(OPENCLAW_CONFIG_PATH, 'utf-8'));
     const agents = config.agents?.list || [];
@@ -84,6 +84,7 @@ function syncAgentsFromOpenClaw(): void {
         enabled: entry.enabled !== false,
       }));
 
+      // Use type field for persistence
       queries.upsertAgent({
         id: agentConfig.id,
         name: agentConfig.name || agentConfig.id,
@@ -94,7 +95,16 @@ function syncAgentsFromOpenClaw(): void {
         agentDir: agentConfig.agentDir || '',
         skills,
         status: 'idle',
+        source: 'openclaw',
       });
+    }
+
+    // Also sync Claude agents
+    try {
+      const { syncAgents } = await import('./db/agent-sync.js');
+      syncAgents(); // This function is synchronous
+    } catch (err) {
+      console.error('[Sync] Failed to sync Claude agents:', err);
     }
 
     // Ensure default pipeline template exists
@@ -107,9 +117,9 @@ function syncAgentsFromOpenClaw(): void {
       );
     }
 
-    console.log(`[Sync] Synced ${agents.filter((a: any) => a.id !== 'main' && a.id !== 'claude').length} agents from OpenClaw config`);
+    console.log(`[Sync] Synced ${agents.filter((a: any) => a.id !== 'main' && a.id !== 'claude').length} OpenClaw agents`);
   } catch (err) {
-    console.error('[Sync] Failed to sync agents from OpenClaw config:', err);
+    console.error('[Sync] Failed to sync agents:', err);
   }
 }
 
@@ -120,7 +130,7 @@ async function start() {
   console.log('[Server] Database initialized');
 
   // Sync agents
-  syncAgentsFromOpenClaw();
+  syncAllAgents();
 
   // Start server
   app.listen(PORT, () => {

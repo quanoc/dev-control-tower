@@ -1,18 +1,25 @@
 -- AI Pipeline Dashboard Database Schema
 
--- Agent configuration table (synced from OpenClaw openclaw.json)
+-- Agent configuration table (unified for OpenClaw, Claude, and custom agents)
 CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    role TEXT NOT NULL,
-    emoji TEXT,
-    description TEXT,
-    workspace TEXT,
-    agent_dir TEXT,
+    type TEXT NOT NULL DEFAULT 'openclaw',  -- 'openclaw' | 'claude' | 'custom'
+    role TEXT NOT NULL DEFAULT '',           -- 角色 (如 PM, RD, 架构师)
+    emoji TEXT,                               -- 图标
+    description TEXT,                         -- 描述
+    path TEXT,                                 -- 路径 (workspace 或 agent_dir)
     skills TEXT DEFAULT '[]',
     status TEXT DEFAULT 'idle',
     current_task_id INTEGER,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- Extended fields for multi-agent support
+    model TEXT,                                -- 'sonnet' | 'opus' | 'haiku' (claude/custom only)
+    system_prompt TEXT,                        -- custom system prompt (custom only)
+    tools TEXT DEFAULT '[]',                  -- allowed tools (claude/custom only)
+    metadata TEXT DEFAULT '{}',                -- 额外信息 JSON
+    last_sync TEXT,                            -- 最后同步时间
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Task table
