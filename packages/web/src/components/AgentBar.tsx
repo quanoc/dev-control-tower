@@ -1,4 +1,6 @@
+import { useMemo, useState } from 'react';
 import type { Agent } from '@pipeline/shared';
+import { ChevronDown } from 'lucide-react';
 
 interface AgentBarProps {
   agents: Agent[];
@@ -15,6 +17,8 @@ const PIPELINE_ORDER = [
   'xiaowen-docs',
   'xiaoyun-ops',
 ];
+
+const CLAUDE_SHOWN_LIMIT = 2;
 
 const ROLE_LABELS: Record<string, string> = {
   'xiaoxi-pm':      '需求评审',
@@ -56,12 +60,55 @@ function sortByPipeline(agents: Agent[]): Agent[] {
   });
 }
 
+interface GroupedAgents {
+  openclaw: Agent[];
+  claude: Agent[];
+  others: Agent[];
+}
+
+function groupAgents(agents: Agent[]): GroupedAgents {
+  const result: GroupedAgents = { openclaw: [], claude: [], others: [] };
+
+  for (const agent of agents) {
+    if (agent.source === 'openclaw') {
+      result.openclaw.push(agent);
+    } else if (agent.source === 'claude') {
+      result.claude.push(agent);
+    } else {
+      result.others.push(agent);
+    }
+  }
+
+  // Sort OpenClaw by pipeline order
+  result.openclaw.sort((a, b) => {
+    const ai = PIPELINE_ORDER.indexOf(a.id);
+    const bi = PIPELINE_ORDER.indexOf(b.id);
+    // Put ordered ones first, then unordered ones
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
+  return result;
+}
+
 export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
-  const sorted = sortByPipeline(agents);
+  const [showAllClaude, setShowAllClaude] = useState(false);
+
+  const grouped = useMemo(() => groupAgents(agents), [agents]);
+
+  const visibleClaude = showAllClaude
+    ? grouped.claude
+    : grouped.claude.slice(0, CLAUDE_SHOWN_LIMIT);
+  const hiddenClaudeCount = grouped.claude.length - CLAUDE_SHOWN_LIMIT;
+
+  // Combine: OpenClaw + visible Claude + others
+  const displayAgents = [...grouped.openclaw, ...visibleClaude, ...grouped.others];
 
   return (
     <div className="flex items-stretch gap-2 px-6 py-2 overflow-x-auto">
-      {sorted.map(agent => {
+      {displayAgents.map(agent => {
         const isSelected = selectedId === agent.id;
         const roleLabel = ROLE_LABELS[agent.id] || agent.role;
         const roleType = ROLE_TYPE[agent.id] || '';
@@ -107,6 +154,17 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
           </button>
         );
       })}
+
+      {/* Claude agents overflow indicator */}
+      {hiddenClaudeCount > 0 && !showAllClaude && (
+        <button
+          onClick={() => setShowAllClaude(true)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+          +{hiddenClaudeCount}
+        </button>
+      )}
     </div>
   );
 }
