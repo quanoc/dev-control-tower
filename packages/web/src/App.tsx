@@ -1,12 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, Settings, LayoutDashboard, GitBranch, Bot } from 'lucide-react';
-import { AgentBar } from './components/AgentBar';
-import { AgentDrawer } from './components/AgentDrawer';
-import { TaskList } from './components/TaskList';
-import { NewTaskDialog } from './components/NewTaskDialog';
-import { PipelineManager } from './components/PipelineManager';
-import { ComponentLibrary } from './components/ComponentLibrary';
-import { AgentLibrary } from './components/AgentLibrary';
+import { RefreshCw, Settings, LayoutDashboard, GitBranch, Bot } from 'lucide-react';
+import { TasksPage } from './pages/TasksPage';
+import { AgentsPage } from './pages/AgentsPage';
+import { ComponentsPage } from './pages/ComponentsPage';
+import { PipelinesPage } from './pages/PipelinesPage';
 import { useAgentStore } from './store/agents';
 import { useTaskStore } from './store/tasks';
 import { api } from './api/client';
@@ -23,7 +20,6 @@ function App() {
   const fetchTasks = useTaskStore(s => s.fetchTasks);
 
   const [currentPage, setCurrentPage] = useState<Page>('tasks');
-  const [showNewTask, setShowNewTask] = useState(false);
   const [templates, setTemplates] = useState<PipelineTemplate[]>([]);
   const [manualRefreshing, setManualRefreshing] = useState(false);
 
@@ -65,7 +61,6 @@ function App() {
     setManualRefreshing(false);
   };
 
-  const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const runningCount = tasks.filter(t => t.status === 'running').length;
   const pendingCount = tasks.filter(t => t.status === 'pending').length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
@@ -146,82 +141,15 @@ function App() {
       </header>
 
       {/* Page Content */}
-      {currentPage === 'tasks' ? (
-        <>
-          {/* Agent Role Bar */}
-          <section className="border-b border-gray-800/50">
-            <div className="flex items-center justify-between px-6 pt-3 pb-2">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <span>👥</span>
-                <span>数字团队</span>
-                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">DIGITAL TEAMS</span>
-                <span className="text-xs text-gray-500 ml-2">
-                  已发现 <span className="text-cyan-400 font-mono font-semibold">{agents.length}</span> 个 Agent
-                </span>
-              </h2>
-            </div>
-            <AgentBar
-              agents={agents}
-              selectedId={selectedAgentId}
-              onSelect={selectAgent}
-            />
-          </section>
-
-          {/* Agent Detail Drawer */}
-          {selectedAgent && (
-            <AgentDrawer agent={selectedAgent} onClose={() => selectAgent(null)} />
-          )}
-
-          {/* Main Content */}
-          <main className="flex-1 px-6 py-4">
-            {/* Task toolbar */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <span>📋</span>
-                <span>需求任务流水线</span>
-                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">TASK PIPELINE</span>
-              </h2>
-              <button
-                onClick={() => setShowNewTask(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                新建需求
-              </button>
-            </div>
-
-            {/* Task List */}
-            <TaskList />
-          </main>
-
-          {/* New Task Dialog */}
-          {showNewTask && (
-            <NewTaskDialog
-              templates={templates}
-              onClose={() => setShowNewTask(false)}
-              onSuccess={() => {
-                setShowNewTask(false);
-                fetchTasks();
-              }}
-            />
-          )}
-        </>
-      ) : currentPage === 'agents' ? (
-        /* Agent Management Page */
-        <main className="flex-1 px-6 py-6">
-          <AgentLibrary />
-        </main>
-      ) : currentPage === 'components' ? (
-        /* Pipeline Components Page */
-        <main className="flex-1 px-6 py-6">
-          <ComponentLibrary />
-        </main>
-      ) : (
-        /* Pipeline Templates Page */
-        <main className="flex-1 px-6 py-6">
-          <PipelineManager />
-        </main>
+      {currentPage === 'tasks' && (
+        <TasksPage
+          templates={templates}
+          onRefreshTasks={fetchTasks}
+        />
       )}
+      {currentPage === 'agents' && <AgentsPage />}
+      {currentPage === 'components' && <ComponentsPage />}
+      {currentPage === 'pipelines' && <PipelinesPage />}
     </div>
   );
 }
