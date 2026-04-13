@@ -15,11 +15,6 @@ const ACTOR_TABS: { key: ActorType; label: string; icon: string }[] = [
   { key: 'system', label: '系统',  icon: '⚙️' },
 ];
 
-const EXECUTION_MODES: { key: 'serial' | 'parallel'; label: string; icon: string; desc: string }[] = [
-  { key: 'serial',   label: '串行', icon: '→',  desc: '等待上一步完成后执行' },
-  { key: 'parallel', label: '并行', icon: '⚡', desc: '与其他并行步骤同时执行' },
-];
-
 function getActionsForActor(actorType: ActorType) {
   switch (actorType) {
     case 'agent':  return AGENT_ACTIONS;
@@ -129,35 +124,6 @@ export function StepDrawer({ step, phaseKey, onChange, onClose }: StepDrawerProp
                     <div>
                       <div className="text-xs font-medium text-gray-200">{action.label}</div>
                       <div className="text-[10px] text-gray-500">{action.description}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Execution Mode */}
-            <div>
-              <label className="text-xs text-gray-500 mb-2 block">执行方式</label>
-              <div className="flex gap-2">
-                {EXECUTION_MODES.map(mode => (
-                  <button
-                    key={mode.key}
-                    type="button"
-                    onClick={() => onChange('execution', mode.key)}
-                    className={`flex-1 flex items-center gap-2 p-3 rounded-lg text-left transition-colors ${
-                      step.execution === mode.key
-                        ? mode.key === 'parallel'
-                          ? 'bg-cyan-600/20 border border-cyan-500/40'
-                          : 'bg-blue-600/20 border border-blue-500/40'
-                        : 'bg-gray-800 border border-gray-700 hover:border-gray-600'
-                    }`}
-                  >
-                    <span className="text-lg">{mode.icon}</span>
-                    <div>
-                      <div className={`text-sm font-medium ${
-                        mode.key === 'parallel' ? 'text-cyan-400' : 'text-blue-400'
-                      }`}>{mode.label}</div>
-                      <div className="text-[10px] text-gray-500">{mode.desc}</div>
                     </div>
                   </button>
                 ))}

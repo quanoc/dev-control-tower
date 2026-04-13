@@ -12,7 +12,6 @@ interface Component {
   agent_id: string | null;
   human_role: string | null;
   icon: string | null;
-  execution: string;
   optional: number;
 }
 
@@ -39,6 +38,8 @@ const HUMAN_ACTIONS = [
 ];
 
 const SYSTEM_ACTIONS = [
+  { key: 'code_pull', label: '代码拉取', icon: '📥' },
+  { key: 'code_merge', label: '代码合并', icon: '🔀' },
   { key: 'lint', label: '代码检查', icon: '🔍' },
   { key: 'build', label: '构建编译', icon: '⚙️' },
   { key: 'security_scan', label: '安全扫描', icon: '🔒' },
@@ -115,7 +116,6 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
     action: 'code',
     agent_id: '',
     human_role: '',
-    execution: 'serial',
     optional: false,
   });
 
@@ -176,7 +176,6 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
       action: comp.action,
       agent_id: comp.agent_id || '',
       human_role: comp.human_role || '',
-      execution: comp.execution,
       optional: comp.optional === 1,
     });
     setEditingId(comp.id);
@@ -202,7 +201,6 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
       action: 'code',
       agent_id: '',
       human_role: '',
-      execution: 'serial',
       optional: false,
     });
     setEditingId(null);
@@ -329,9 +327,6 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
                     <span className={`px-2 py-0.5 rounded text-[10px] ${actorBadge.bg} ${actorBadge.text}`}>
                       {ACTOR_SHORT[comp.actor_type]}
                     </span>
-                    {comp.execution === 'parallel' && (
-                      <span className="text-[10px] text-cyan-400">⚡ 并行</span>
-                    )}
                     {comp.optional === 1 && (
                       <span className="text-[10px] text-gray-600">可选</span>
                     )}
@@ -467,47 +462,14 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
                 </div>
               )}
 
-              {formData.actor_type === 'human' && (
+              {formData.actor_type === 'system' && (
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">人工角色</label>
-                  <input
-                    type="text"
-                    value={formData.human_role}
-                    onChange={e => setFormData({ ...formData, human_role: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
-                    placeholder="例如：senior_dev, product_owner"
-                  />
+                  <label className="text-xs text-gray-500 mb-1 block">系统配置</label>
+                  <div className="text-xs text-gray-400 bg-gray-900 border border-gray-700 rounded-lg p-2">
+                    系统组件将在执行时自动处理
+                  </div>
                 </div>
               )}
-
-              {/* Execution Mode */}
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">执行模式</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, execution: 'serial' })}
-                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
-                      formData.execution === 'serial'
-                        ? 'border-blue-500 bg-blue-500/10 text-white'
-                        : 'border-gray-700 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    串行
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, execution: 'parallel' })}
-                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
-                      formData.execution === 'parallel'
-                        ? 'border-blue-500 bg-blue-500/10 text-white'
-                        : 'border-gray-700 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    并行 ⚡
-                  </button>
-                </div>
-              </div>
 
               {/* Optional */}
               <div className="flex items-center gap-2">

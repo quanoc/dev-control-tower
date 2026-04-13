@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, X, GitBranch, Check } from 'lucide-react';
 import { api } from '../api/client';
-import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, ExecutionMode, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
+import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
 import { PipelinePreview } from './PipelinePreview';
 import { StepDrawer } from './StepDrawer';
-import { StagePicker } from './StagePicker';
-import { getActionDef, PRESET_TEMPLATES } from '@pipeline/shared';
+import { ComponentPickerDrawer } from './ComponentPickerDrawer';
+import { getActionDef, getPhaseDef, PRESET_TEMPLATES } from '@pipeline/shared';
 
 const COMPLEXITY_OPTIONS = [
   { key: 'small' as const, label: '小需求', desc: '快速交付', icon: '⚡' },
@@ -18,7 +18,7 @@ function makeStepKey(): string {
   return `step_${Date.now()}_${++stepCounter}`;
 }
 
-function makeStep(action: string, actorType: 'agent' | 'human' | 'system', opts?: { agentId?: string; humanRole?: string; optional?: boolean; execution?: ExecutionMode }): PipelineStep {
+function makeStep(action: string, actorType: 'agent' | 'human' | 'system', opts?: { agentId?: string; humanRole?: string; optional?: boolean }): PipelineStep {
   const def = getActionDef(action);
   return {
     key: makeStepKey(),
@@ -29,7 +29,6 @@ function makeStep(action: string, actorType: 'agent' | 'human' | 'system', opts?
     humanRole: opts?.humanRole,
     optional: opts?.optional ?? false,
     icon: def?.icon || '⚙️',
-    execution: opts?.execution ?? 'serial',
   };
 }
 
@@ -99,25 +98,130 @@ export function PipelineManager() {
   };
 
   // Two-level editor handlers
-  const addStepToPhase = (phaseKey: PhaseKey, actorType: 'agent' | 'human' | 'system', action: string, execution: ExecutionMode = 'serial') => {
-    const newStep = makeStep(action, actorType, { execution });
-    setFormData(prev => ({
-      ...prev,
-      phases: prev.phases.map(p => p.phaseKey === phaseKey ? { ...p, steps: [...p.steps, newStep] } : p),
-    }));
+  const addStepToPhase = (phaseKey: PhaseKey, actorType: 'agent' | 'human' | 'system', action: string) => {
+    const newStep = makeStep(action, actorType);
+    setFormData(prev => {
+      const existing = prev.phases.find(p => p.phaseKey === phaseKey);
+      if (existing) {
+        // Add step to end, default to serial (new batch with size 1)
+        const newBatches = [...(existing.batches || existing.steps.map(() => 1)), 1];
+        return {
+          ...prev,
+          phases: prev.phases.map(p =>
+            p.phaseKey === phaseKey
+              ? { ...p, steps: [...p.steps, newStep], batches: newBatches }
+              : p
+          ),
+        };
+      }
+      const def = getPhaseDef(phaseKey as string);
+      return {
+        ...prev,
+        phases: [
+          ...prev.phases,
+          {
+            phaseKey,
+            label: def?.label || phaseKey,
+            icon: def?.icon || '📌',
+            steps: [newStep],
+            batches: [1],
+          },
+        ],
+      };
+    });
     setShowPicker(false);
     setPickerPhase(null);
     setSelectedStep({ phaseKey, stepIndex: formData.phases.find(p => p.phaseKey === phaseKey)?.steps.length ?? 0 });
   };
 
   const removeStep = (phaseKey: string, stepIndex: number) => {
-    setFormData(prev => ({
-      ...prev,
-      phases: prev.phases.map(p => p.phaseKey === phaseKey ? { ...p, steps: p.steps.filter((_, i) => i !== stepIndex) } : p),
-    }));
+    setFormData(prev => {
+      const phase = prev.phases.find(p => p.phaseKey === phaseKey);
+      if (!phase) return prev;
+
+      // Rebuild batches after removing step
+      const newSteps = phase.steps.filter((_, i) => i !== stepIndex);
+      const batches = phase.batches || phase.steps.map(() => 1);
+
+      // Find which batch this step was in and adjust
+      let currentIdx = 0;
+      let newBatches: number[] = [];
+      for (const batchSize of batches) {
+        const batchStart = currentIdx;
+        const batchEnd = currentIdx + batchSize;
+        if (stepIndex >= batchStart && stepIndex < batchEnd) {
+          // Step is in this batch, reduce size
+          if (batchSize > 1) {
+            newBatches.push(batchSize - 1);
+          }
+          // If batch becomes 0, skip it
+        } else if (stepIndex < batchStart) {
+          // Step is after this batch, keep as is
+          newBatches.push(batchSize);
+        } else {
+          // Step is before this batch, keep as is
+          newBatches.push(batchSize);
+        }
+        currentIdx += batchSize;
+      }
+
+      return {
+        ...prev,
+        phases: prev.phases.map(p =>
+          p.phaseKey === phaseKey
+            ? { ...p, steps: newSteps, batches: newBatches }
+            : p
+        ),
+      };
+    });
     if (selectedStep?.phaseKey === phaseKey && selectedStep.stepIndex === stepIndex) {
       setSelectedStep(null);
     }
+  };
+
+  /** Toggle batch boundary after a step (merge with next = parallel, separate = serial) */
+  const toggleBatchBoundary = (phaseKey: string, afterStepIndex: number) => {
+    setFormData(prev => {
+      const phase = prev.phases.find(p => p.phaseKey === phaseKey);
+      if (!phase || phase.steps.length <= 1) return prev;
+
+      const batches = phase.batches || phase.steps.map(() => 1);
+      let currentIdx = 0;
+      let newBatches: number[] = [];
+      let found = false;
+
+      for (const batchSize of batches) {
+        const batchStart = currentIdx;
+        const batchEnd = currentIdx + batchSize;
+
+        if (afterStepIndex >= batchStart && afterStepIndex < batchEnd - 1) {
+          // Clicked inside a batch with multiple steps - split this batch
+          const splitPoint = afterStepIndex - batchStart + 1;
+          newBatches.push(splitPoint);
+          newBatches.push(batchSize - splitPoint);
+          found = true;
+        } else if (afterStepIndex === batchEnd - 1 && !found) {
+          // Clicked at end of batch - check if next batch should merge
+          if (newBatches.length > 0) {
+            // Merge with previous batch
+            newBatches[newBatches.length - 1] += batchSize;
+          } else {
+            newBatches.push(batchSize);
+          }
+          found = true;
+        } else {
+          newBatches.push(batchSize);
+        }
+        currentIdx += batchSize;
+      }
+
+      return {
+        ...prev,
+        phases: prev.phases.map(p =>
+          p.phaseKey === phaseKey ? { ...p, batches: newBatches } : p
+        ),
+      };
+    });
   };
 
   const updateStep = (phaseKey: string, stepIndex: number, field: keyof PipelineStep, value: string | boolean) => {
@@ -454,6 +558,7 @@ export function PipelineManager() {
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
                     onAddPhaseAfter={addPhaseAfter}
+                    onToggleBatchBoundary={toggleBatchBoundary}
                   />
                 </div>
               </div>
@@ -474,8 +579,41 @@ export function PipelineManager() {
               })()}
 
               {showPicker && pickerPhase && (
-                <StagePicker
-                  onSelect={(actorType, action, execution) => addStepToPhase(pickerPhase, actorType, action, execution)}
+                <ComponentPickerDrawer
+                  phaseKey={pickerPhase}
+                  onSelect={(step) => {
+                    setFormData(prev => {
+                      const existing = prev.phases.find(p => p.phaseKey === pickerPhase);
+                      if (existing) {
+                        // Add step to end with serial batch
+                        const newBatches = [...(existing.batches || existing.steps.map(() => 1)), 1];
+                        return {
+                          ...prev,
+                          phases: prev.phases.map(p =>
+                            p.phaseKey === pickerPhase
+                              ? { ...p, steps: [...p.steps, step], batches: newBatches }
+                              : p
+                          ),
+                        };
+                      }
+                      const def = getPhaseDef(pickerPhase as string);
+                      return {
+                        ...prev,
+                        phases: [
+                          ...prev.phases,
+                          {
+                            phaseKey: pickerPhase,
+                            label: def?.label || pickerPhase,
+                            icon: def?.icon || '📌',
+                            steps: [step],
+                            batches: [1],
+                          },
+                        ],
+                      };
+                    });
+                    setShowPicker(false);
+                    setPickerPhase(null);
+                  }}
                   onClose={() => { setShowPicker(false); setPickerPhase(null); }}
                 />
               )}

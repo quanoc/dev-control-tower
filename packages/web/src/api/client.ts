@@ -105,7 +105,6 @@ export const api = {
       agent_id?: string;
       human_role?: string;
       icon?: string;
-      execution?: string;
       optional?: boolean;
     }) => request<{ id: number }>('/pipelines/components', {
       method: 'POST',
@@ -119,7 +118,6 @@ export const api = {
       agent_id: string;
       human_role: string;
       icon: string;
-      execution: string;
       optional: boolean;
     }>) => request<{ success: boolean }>(`/pipelines/components/${id}`, {
       method: 'PUT',

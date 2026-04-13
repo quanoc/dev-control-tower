@@ -5,13 +5,17 @@ import { stateMachine } from './statemachine.js';
 import * as queries from '../db/queries.js';
 import type { PipelineStage, PipelineInstance, StageRun, PipelinePhase, Agent } from '@pipeline/shared';
 import { DEFAULT_PIPELINE_STAGES, PHASES } from '@pipeline/shared';
+import { execSync } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
 
 interface StageMeta {
   stageKey: string;
   label: string;
   phaseKey: string;
-  execution: 'serial' | 'parallel';
+  batchIndex: number;
   agentId: string;
+  action: string;
   agentSource?: string;
   agentModel?: string;
   agentSystemPrompt?: string;
@@ -92,8 +96,8 @@ export class PipelineExecutor {
   }
 
   /**
-   * Execute phases serially; within each phase, respect serial/parallel mode.
-   * Uses template phase order if available, falls back to standard PHASES.
+   * Execute phases serially; within each phase, execute steps in batches.
+   * Steps within a batch execute in parallel, batches execute serially.
    */
   private async executePhases(instance: PipelineInstance): Promise<void> {
     const instanceId = instance.id;
@@ -131,53 +135,46 @@ export class PipelineExecutor {
   }
 
   /**
-   * Execute a group of steps within a single phase, respecting serial/parallel mode.
-   * Walks through steps in order:
-   * - Serial steps execute one at a time
-   * - Consecutive parallel steps execute together
+   * Execute a group of steps within a single phase, grouped by batchIndex.
+   * Steps with the same batchIndex execute in parallel.
    */
   private async executePhaseSteps(instance: PipelineInstance, steps: StageMeta[]): Promise<void> {
     const instanceId = instance.id;
     const stageRuns = instance.stageRuns;
-    let i = 0;
 
-    while (i < steps.length && this.running.get(instanceId)) {
-      const step = steps[i];
-      const stageRun = stageRuns.find(sr => sr.stageKey === step.stageKey);
-      if (!stageRun) { i++; continue; }
-
-      // Skip completed/skipped
-      if (stageRun.status === 'completed' || stageRun.status === 'skipped') {
-        i++;
-        continue;
+    // Group steps by batchIndex
+    const batchMap = new Map<number, StageMeta[]>();
+    for (const step of steps) {
+      const batchIdx = step.batchIndex || 0;
+      if (!batchMap.has(batchIdx)) {
+        batchMap.set(batchIdx, []);
       }
+      batchMap.get(batchIdx)!.push(step);
+    }
 
-      if (step.execution === 'serial') {
-        const ok = await this.executeSingleStage(instance, stageRun, step);
-        if (!ok) return;
-        i++;
-      } else {
-        // Collect consecutive parallel steps
-        const parallelBatch: StageMeta[] = [];
-        let j = i;
-        while (j < steps.length) {
-          const s = steps[j];
-          const sr = stageRuns.find(sr => sr.stageKey === s.stageKey);
-          if (s.execution !== 'parallel' || (sr && (sr.status === 'completed' || sr.status === 'skipped'))) {
-            break;
-          }
-          parallelBatch.push(s);
-          j++;
-        }
+    // Sort batches by index
+    const sortedBatches = Array.from(batchMap.entries()).sort((a, b) => a[0] - b[0]);
 
-        if (parallelBatch.length === 0) {
-          i++;
+    // Execute batches serially
+    for (const [batchIdx, batch] of sortedBatches) {
+      if (!this.running.get(instanceId)) return;
+
+      if (batch.length === 1) {
+        // Single step - serial execution
+        const step = batch[0];
+        const stageRun = stageRuns.find(sr => sr.stageKey === step.stageKey);
+        if (!stageRun) continue;
+
+        if (stageRun.status === 'completed' || stageRun.status === 'skipped') {
           continue;
         }
 
-        const ok = await this.executeParallelBatch(instance, parallelBatch);
+        const ok = await this.executeSingleStage(instance, stageRun, step);
         if (!ok) return;
-        i = j;
+      } else {
+        // Multiple steps - parallel execution
+        const ok = await this.executeParallelBatch(instance, batch);
+        if (!ok) return;
       }
     }
   }
@@ -196,6 +193,14 @@ export class PipelineExecutor {
     queries.setStageRunInput(stageRun.id, input);
 
     console.log(`[Executor] Running stage "${meta.label}" (${meta.phaseKey}) with agent "${stageRun.agentId}"`);
+
+    // Handle system actions (like code_pull, code_merge, lint, build, etc.)
+    if (meta.action === 'code_pull') {
+      return await this.executeCodePull(instance, stageRun, meta);
+    }
+    if (meta.action === 'code_merge') {
+      return await this.executeCodeMerge(instance, stageRun, meta);
+    }
 
     // Get the appropriate client based on agent source
     const { client, source } = this.getClientForAgent(stageRun.agentId);
@@ -221,6 +226,219 @@ export class PipelineExecutor {
       queries.updateAgentStatus(stageRun.agentId, 'error', null);
       await stateMachine.transition('stage', stageRun.id, 'failed', 'system');
       console.error(`[Executor] Stage "${meta.label}" failed: ${result.error}`);
+      await stateMachine.transition('pipeline', instanceId, 'failed', 'system');
+      await stateMachine.transition('task', instance.taskId, 'failed', 'system');
+      this.running.delete(instanceId);
+      return false;
+    }
+  }
+
+  /**
+   * Execute code_pull system action.
+   * Pulls code from a git repository to the workspace.
+   */
+  private async executeCodePull(instance: PipelineInstance, stageRun: StageRun, meta: StageMeta): Promise<boolean> {
+    const instanceId = instance.id;
+    const task = queries.getTaskById(instance.taskId);
+    
+    try {
+      // Get task description to parse repository URL
+      const taskDesc = task?.description || '';
+      
+      // Try to extract git repository URL from task description
+      // Supports formats like: repo: https://github.com/user/repo.git
+      // or just the URL anywhere in the description
+      const repoMatch = taskDesc.match(/(?:repo[:\s]+)?(https?:\/\/[^\s]+\.git|git@[^\s]+:[^\s]+\.git)/i);
+      const repoUrl = repoMatch ? repoMatch[1] : null;
+      
+      // Extract branch (optional)
+      const branchMatch = taskDesc.match(/branch[:\s]+(\w+)/i);
+      const branch = branchMatch ? branchMatch[1] : 'main';
+      
+      // Determine target directory
+      const workspaceDir = '/root/.openclaw/workspace';
+      const taskDir = task ? `task_${task.id}` : `pipeline_${instanceId}`;
+      const targetDir = path.join(workspaceDir, taskDir);
+      
+      let output = '';
+      
+      if (!repoUrl) {
+        // No repository URL found - skip this step but mark as completed
+        output = '未在任务描述中找到仓库地址，跳过代码拉取\n\n' +
+                 '提示：在任务描述中添加仓库地址，例如：\n' +
+                 'repo: https://github.com/user/repo.git\n' +
+                 'branch: main (可选，默认为 main)';
+        
+        queries.setStageRunOutput(stageRun.id, output);
+        queries.updateStageRunStatus(stageRun.id, 'completed');
+        await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+        console.log(`[Executor] Stage "${meta.label}" completed (no repo URL found)`);
+        return true;
+      }
+      
+      // Ensure target directory exists
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      
+      // Check if it's already a git repo
+      const gitDir = path.join(targetDir, '.git');
+      
+      if (fs.existsSync(gitDir)) {
+        // Pull latest changes
+        output += `仓库已存在，执行 git pull...\n`;
+        const pullResult = execSync('git pull', { 
+          cwd: targetDir, 
+          encoding: 'utf-8',
+          timeout: 120000
+        });
+        output += pullResult || '已更新到最新版本\n';
+      } else {
+        // Clone repository
+        output += `正在克隆仓库: ${repoUrl}\n`;
+        output += `目标目录: ${targetDir}\n`;
+        output += `分支: ${branch}\n\n`;
+        
+        // Remove existing directory contents if any
+        if (fs.existsSync(targetDir)) {
+          const files = fs.readdirSync(targetDir);
+          for (const file of files) {
+            const filePath = path.join(targetDir, file);
+            fs.rmSync(filePath, { recursive: true, force: true });
+          }
+        }
+        
+        const cloneResult = execSync(`git clone --branch ${branch} --single-branch ${repoUrl} .`, {
+          cwd: targetDir,
+          encoding: 'utf-8',
+          timeout: 300000
+        });
+        output += cloneResult || '克隆完成\n';
+      }
+      
+      // Get commit info
+      try {
+        const commitInfo = execSync('git log -1 --oneline', {
+          cwd: targetDir,
+          encoding: 'utf-8'
+        });
+        output += `\n当前版本: ${commitInfo.trim()}`;
+      } catch {
+        // Ignore commit info errors
+      }
+      
+      queries.setStageRunOutput(stageRun.id, output);
+      queries.updateStageRunStatus(stageRun.id, 'completed');
+      await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+      console.log(`[Executor] Stage "${meta.label}" completed - code pulled to ${targetDir}`);
+      return true;
+      
+    } catch (error) {
+      const errorMsg = `代码拉取失败: ${error instanceof Error ? error.message : String(error)}`;
+      console.error(`[Executor] Stage "${meta.label}" failed:`, error);
+      
+      queries.updateStageRunStatus(stageRun.id, 'failed', errorMsg);
+      await stateMachine.transition('stage', stageRun.id, 'failed', 'system');
+      await stateMachine.transition('pipeline', instanceId, 'failed', 'system');
+      await stateMachine.transition('task', instance.taskId, 'failed', 'system');
+      this.running.delete(instanceId);
+      return false;
+    }
+  }
+
+  /**
+   * Execute code_merge system action.
+   * Merges a target branch into the current branch in the workspace.
+   */
+  private async executeCodeMerge(instance: PipelineInstance, stageRun: StageRun, meta: StageMeta): Promise<boolean> {
+    const instanceId = instance.id;
+    const task = queries.getTaskById(instance.taskId);
+
+    try {
+      const taskDesc = task?.description || '';
+      const workspaceDir = '/root/.openclaw/workspace';
+      const taskDir = task ? `task_${task.id}` : `pipeline_${instanceId}`;
+      const targetDir = path.join(workspaceDir, taskDir);
+
+      // Parse target branch to merge from task description
+      // Supports: merge: main, target: develop, source: feature/x
+      const mergeMatch = taskDesc.match(/(?:merge|target|source)[\s:]+([\w\-/]+)/i);
+      const sourceBranch = mergeMatch ? mergeMatch[1] : null;
+
+      let output = '';
+
+      if (!fs.existsSync(path.join(targetDir, '.git'))) {
+        output = '目标目录不是 Git 仓库，无法执行合并\n提示：请先添加 code_pull 步骤拉取代码';
+        queries.setStageRunOutput(stageRun.id, output);
+        queries.updateStageRunStatus(stageRun.id, 'failed');
+        await stateMachine.transition('stage', stageRun.id, 'failed', 'system');
+        await stateMachine.transition('pipeline', instanceId, 'failed', 'system');
+        await stateMachine.transition('task', instance.taskId, 'failed', 'system');
+        this.running.delete(instanceId);
+        return false;
+      }
+
+      if (!sourceBranch) {
+        output = '未在任务描述中找到要合并的目标分支，跳过代码合并\n\n' +
+                 '提示：在任务描述中添加合并分支，例如：\n' +
+                 'merge: main\n' +
+                 'target: develop';
+        queries.setStageRunOutput(stageRun.id, output);
+        queries.updateStageRunStatus(stageRun.id, 'completed');
+        await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+        console.log(`[Executor] Stage "${meta.label}" completed (no merge branch found)`);
+        return true;
+      }
+
+      // Fetch latest refs
+      output += `获取远程分支信息...\n`;
+      const fetchResult = execSync('git fetch origin', {
+        cwd: targetDir,
+        encoding: 'utf-8',
+        timeout: 120000,
+      });
+      output += fetchResult || '已获取最新分支信息\n';
+
+      // Get current branch
+      const currentBranch = execSync('git branch --show-current', {
+        cwd: targetDir,
+        encoding: 'utf-8',
+      }).trim();
+
+      output += `\n当前分支: ${currentBranch}\n`;
+      output += `合并分支: ${sourceBranch}\n`;
+
+      // Perform merge
+      const mergeResult = execSync(`git merge origin/${sourceBranch} --no-edit`, {
+        cwd: targetDir,
+        encoding: 'utf-8',
+        timeout: 120000,
+      });
+      output += mergeResult || `成功合并 ${sourceBranch}\n`;
+
+      // Get latest commit info
+      try {
+        const commitInfo = execSync('git log -1 --oneline', {
+          cwd: targetDir,
+          encoding: 'utf-8',
+        });
+        output += `\n合并后版本: ${commitInfo.trim()}`;
+      } catch {
+        // Ignore commit info errors
+      }
+
+      queries.setStageRunOutput(stageRun.id, output);
+      queries.updateStageRunStatus(stageRun.id, 'completed');
+      await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+      console.log(`[Executor] Stage "${meta.label}" completed - merged ${sourceBranch} into ${currentBranch}`);
+      return true;
+
+    } catch (error) {
+      const errorMsg = `代码合并失败: ${error instanceof Error ? error.message : String(error)}`;
+      console.error(`[Executor] Stage "${meta.label}" failed:`, error);
+
+      queries.updateStageRunStatus(stageRun.id, 'failed', errorMsg);
+      await stateMachine.transition('stage', stageRun.id, 'failed', 'system');
       await stateMachine.transition('pipeline', instanceId, 'failed', 'system');
       await stateMachine.transition('task', instance.taskId, 'failed', 'system');
       this.running.delete(instanceId);
@@ -301,7 +519,7 @@ export class PipelineExecutor {
   }
 
   /**
-   * Resolve stage metadata (phaseKey, execution, label) for each stage run.
+   * Resolve stage metadata (phaseKey, batchIndex, label) for each stage run.
    * Looks up from the template first, falls back to default stages.
    */
   private resolveStageMeta(instance: PipelineInstance): StageMeta[] {
@@ -317,8 +535,9 @@ export class PipelineExecutor {
           stageKey: sr.stageKey,
           label: tmplStage.label || sr.stageKey,
           phaseKey: tmplStage.phaseKey || 'development',
-          execution: tmplStage.execution || 'serial',
+          batchIndex: tmplStage.batchIndex ?? 0,
           agentId: sr.agentId,
+          action: tmplStage.action || sr.stageKey,
         };
       }
 
@@ -329,18 +548,20 @@ export class PipelineExecutor {
           stageKey: sr.stageKey,
           label: defStage.label || sr.stageKey,
           phaseKey: defStage.phaseKey || 'development',
-          execution: defStage.execution || 'serial',
+          batchIndex: defStage.batchIndex ?? 0,
           agentId: sr.agentId,
+          action: defStage.action || sr.stageKey,
         };
       }
 
-      // Unknown stage — default to development/serial
+      // Unknown stage — default to development/batch 0
       return {
         stageKey: sr.stageKey,
         label: sr.stageKey,
         phaseKey: 'development',
-        execution: 'serial',
+        batchIndex: 0,
         agentId: sr.agentId,
+        action: sr.stageKey,
       };
     });
   }

@@ -40,11 +40,10 @@ CREATE TABLE IF NOT EXISTS pipeline_components (
     name TEXT NOT NULL,
     description TEXT,
     actor_type TEXT NOT NULL,  -- 'agent' | 'human' | 'system'
-    action TEXT NOT NULL,      -- 'analyze' | 'design' | 'code' | 'review' | 'test' | 'document' | 'deploy' | 'approve' | 'review' | 'lint' | 'build' | 'security_scan' | 'test_e2e'
+    action TEXT NOT NULL,      -- 'analyze' | 'design' | 'code' | 'review' | 'test' | 'document' | 'deploy' | 'approve' | 'review' | 'lint' | 'build' | 'security_scan' | 'test_e2e' | 'code_pull' | 'code_merge'
     agent_id TEXT,
     human_role TEXT,
     icon TEXT,
-    execution TEXT DEFAULT 'serial',  -- 'serial' | 'parallel'
     optional INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

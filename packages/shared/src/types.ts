@@ -75,7 +75,8 @@ export type SystemFlowType =
   | 'build'         // 构建编译
   | 'security_scan' // 安全扫描
   | 'test_e2e'      // E2E 测试
-  | 'code_pull';    // 代码拉取
+  | 'code_pull'     // 代码拉取
+  | 'code_merge';   // 代码合并
 
 /** Project complexity levels */
 export type PipelineComplexity = 'small' | 'medium' | 'large';
@@ -143,8 +144,6 @@ export interface PipelineStep {
   humanRole?: string;
   optional: boolean;
   icon: string;
-  /** How this step executes relative to siblings in the same phase */
-  execution: ExecutionMode;
   /** Optional reference to a reusable pipeline component */
   componentId?: number;
 }
@@ -153,13 +152,21 @@ export interface PipelineStep {
 
 /**
  * PipelinePhase = a group of steps within a phase of the R&D workflow.
- * Contains one or more PipelineSteps that are executed together.
+ * Steps are executed in batches: steps within a batch execute in parallel,
+ * batches execute sequentially (serially).
  */
 export interface PipelinePhase {
   phaseKey: PhaseKey;
   label: string;
   icon: string;
   steps: PipelineStep[];
+  /**
+   * Batch configuration: each number represents how many steps are in that batch.
+   * Steps within a batch execute in parallel, batches execute serially.
+   * Example: [2, 1, 3] means: 2 parallel → 1 serial → 3 parallel
+   * If not specified, defaults to all steps serial: [1, 1, 1, ...]
+   */
+  batches?: number[];
 }
 
 // ─── Flattened Stage (for executor / backward compat) ──────────
@@ -178,7 +185,8 @@ export interface PipelineStage {
   optional: boolean;
   icon: string;
   phaseKey: PhaseKey;
-  execution: ExecutionMode;
+  /** Batch index this stage belongs to within its phase */
+  batchIndex?: number;
   // ─── Backward compatibility (legacy v1 fields) ───────────
   /** @deprecated Use actorType + action instead */
   type?: 'agent_action' | 'human_approval' | 'fixed_flow';
@@ -186,14 +194,23 @@ export interface PipelineStage {
   approverRole?: string;
   /** @deprecated Use action instead */
   flowKey?: string;
+  /** @deprecated Phase-level batches configuration */
+  execution?: ExecutionMode;
 }
 
 /** Flatten nested phases to a serializable stage list for executor */
 export function flattenPhases(phases: PipelinePhase[]): PipelineStage[] {
   const stages: PipelineStage[] = [];
   for (const phase of phases) {
-    for (const step of phase.steps) {
-      stages.push({ ...step, phaseKey: phase.phaseKey });
+    const batches = phase.batches || phase.steps.map(() => 1); // Default: all serial
+    let stepIdx = 0;
+    let batchIdx = 0;
+    for (const batchSize of batches) {
+      for (let i = 0; i < batchSize && stepIdx < phase.steps.length; i++) {
+        const step = phase.steps[stepIdx++];
+        stages.push({ ...step, phaseKey: phase.phaseKey, batchIndex: batchIdx });
+      }
+      batchIdx++;
     }
   }
   return stages;
@@ -201,22 +218,37 @@ export function flattenPhases(phases: PipelinePhase[]): PipelineStage[] {
 
 /** Group flat stages back into phases for editing */
 export function groupStagesIntoPhases(stages: PipelineStage[]): PipelinePhase[] {
-  const phaseMap = new Map<PhaseKey, PipelinePhase>();
-  // Add standard phases
-  for (const phase of PHASES) {
-    phaseMap.set(phase.key, { phaseKey: phase.key, label: phase.label, icon: phase.icon, steps: [] });
-  }
+  const phaseMap = new Map<PhaseKey, { steps: PipelineStep[]; batches: number[] }>();
+
   for (const stage of stages) {
-    let group = phaseMap.get(stage.phaseKey);
-    // Custom phase: create on the fly
-    if (!group) {
-      group = { phaseKey: stage.phaseKey, label: stage.phaseKey, icon: '📌', steps: [] };
-      phaseMap.set(stage.phaseKey, group);
+    if (!phaseMap.has(stage.phaseKey)) {
+      phaseMap.set(stage.phaseKey, { steps: [], batches: [] });
     }
-    const { phaseKey, ...step } = stage;
-    group.steps.push(step);
+    const group = phaseMap.get(stage.phaseKey)!;
+    const { phaseKey, batchIndex, execution, ...step } = stage;
+    group.steps.push(step as PipelineStep);
+    // Track batch indices
+    if (batchIndex !== undefined) {
+      while (group.batches.length <= batchIndex) {
+        group.batches.push(0);
+      }
+      group.batches[batchIndex]++;
+    }
   }
-  return Array.from(phaseMap.values()).filter(p => p.steps.length > 0);
+
+  // Convert to phases
+  const result: PipelinePhase[] = [];
+  for (const [phaseKey, { steps, batches }] of phaseMap) {
+    const def = getPhaseDef(phaseKey);
+    result.push({
+      phaseKey,
+      label: def?.label || phaseKey,
+      icon: def?.icon || '📌',
+      steps,
+      batches: batches.length > 0 ? batches : steps.map(() => 1),
+    });
+  }
+  return result;
 }
 
 export type PipelineInstanceStatus = 'pending' | 'running' | 'completed' | 'failed' | 'paused' | 'cancelled';
@@ -344,6 +376,7 @@ export const SYSTEM_FLOWS: StageActionDef[] = [
   { key: 'security_scan', label: '安全扫描',   icon: '🔒', description: '安全漏洞扫描',       defaultPhase: 'testing' },
   { key: 'test_e2e',      label: 'E2E 测试',   icon: '🖥️', description: '端到端自动化测试',   defaultPhase: 'testing' },
   { key: 'code_pull',     label: '代码拉取',   icon: '📥', description: '从仓库拉取代码',     defaultPhase: 'development' },
+  { key: 'code_merge',    label: '代码合并',   icon: '🔀', description: '合并目标分支代码',   defaultPhase: 'development' },
 ];
 
 export function actionToActorType(action: string): ActorType {
@@ -358,7 +391,7 @@ export function getActionDef(action: string): StageActionDef | undefined {
 
 // ─── Preset Pipeline Templates (Nested DSL) ────────────────────
 
-function step(key: string, label: string, actorType: ActorType, action: AgentActionType | HumanGateType | SystemFlowType, opts: { agentId?: string; humanRole?: string; optional?: boolean; icon?: string; execution?: ExecutionMode } = {}): PipelineStep {
+function step(key: string, label: string, actorType: ActorType, action: AgentActionType | HumanGateType | SystemFlowType, opts: { agentId?: string; humanRole?: string; optional?: boolean; icon?: string } = {}): PipelineStep {
   const def = getActionDef(action);
   return {
     key,
@@ -369,17 +402,17 @@ function step(key: string, label: string, actorType: ActorType, action: AgentAct
     humanRole: opts.humanRole,
     optional: opts.optional ?? false,
     icon: opts.icon || def?.icon || '⚙️',
-    execution: opts.execution ?? 'serial',
   };
 }
 
-function phase(phaseKey: PhaseKey, steps: PipelineStep[], opts?: { label?: string; icon?: string }): PipelinePhase {
+function phase(phaseKey: PhaseKey, steps: PipelineStep[], opts?: { label?: string; icon?: string; batches?: number[] }): PipelinePhase {
   const def = getPhaseDef(phaseKey);
   return {
     phaseKey,
     label: opts?.label || def?.label || phaseKey,
     icon: opts?.icon || def?.icon || '📌',
     steps,
+    batches: opts?.batches || steps.map(() => 1), // Default: all serial
   };
 }
 
@@ -423,8 +456,8 @@ export const PRESET_TEMPLATES: Record<PipelineComplexity, { name: string; descri
       phase('testing', [
         step('unit_test', '单元测试', 'agent', 'test', { agentId: 'xiaozhi-test' }),
         step('integration_test', '集成测试', 'agent', 'test', { agentId: 'xiaozhi-test' }),
-        step('test_e2e', 'E2E测试', 'system', 'test_e2e', { execution: 'parallel' }),
-      ]),
+        step('test_e2e', 'E2E测试', 'system', 'test_e2e'),
+      ], { batches: [2, 1] }), // unit + integration parallel, then e2e serial
       phase('deployment', [
         step('deployment', '部署上线', 'agent', 'deploy', { agentId: 'xiaoyun-ops' }),
       ]),
@@ -443,17 +476,17 @@ export const PRESET_TEMPLATES: Record<PipelineComplexity, { name: string; descri
         step('arch_approval', '架构审批', 'human', 'approve', { humanRole: 'architect' }),
       ]),
       phase('development', [
-        step('lint', '代码检查', 'system', 'lint', { execution: 'parallel' }),
+        step('lint', '代码检查', 'system', 'lint'),
         step('development', '代码开发', 'agent', 'code', { agentId: 'magerd' }),
         step('code_review', '代码评审', 'human', 'review', { humanRole: 'senior_dev' }),
-        step('documentation', '文档输出', 'agent', 'document', { agentId: 'xiaowen-docs', execution: 'parallel' }),
-      ]),
+        step('documentation', '文档输出', 'agent', 'document', { agentId: 'xiaowen-docs' }),
+      ], { batches: [1, 1, 2] }), // lint serial, dev serial, review+doc parallel
       phase('testing', [
         step('unit_test', '单元测试', 'agent', 'test', { agentId: 'xiaozhi-test' }),
         step('integration_test', '集成测试', 'agent', 'test', { agentId: 'xiaozhi-test' }),
-        step('security_scan', '安全扫描', 'system', 'security_scan', { execution: 'parallel' }),
-        step('test_e2e', 'E2E测试', 'system', 'test_e2e', { execution: 'parallel' }),
-      ]),
+        step('security_scan', '安全扫描', 'system', 'security_scan'),
+        step('test_e2e', 'E2E测试', 'system', 'test_e2e'),
+      ], { batches: [2, 2] }), // unit+integration parallel, then scan+e2e parallel
       phase('deployment', [
         step('deployment', '部署上线', 'agent', 'deploy', { agentId: 'xiaoyun-ops' }),
         step('deploy_approval', '上线审批', 'human', 'approve', { humanRole: 'tech_lead' }),

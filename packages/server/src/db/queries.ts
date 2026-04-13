@@ -204,7 +204,6 @@ export interface PipelineComponent {
   agent_id: string | null;
   human_role: string | null;
   icon: string | null;
-  execution: string;
   optional: number;
   created_at: string;
 }
@@ -265,13 +264,12 @@ export function createComponent(data: {
   agent_id?: string;
   human_role?: string;
   icon?: string;
-  execution?: string;
   optional?: boolean;
 }): number {
   const db = getDb();
   const result = db.prepare(`
-    INSERT INTO pipeline_components (name, description, actor_type, action, agent_id, human_role, icon, execution, optional)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO pipeline_components (name, description, actor_type, action, agent_id, human_role, icon, optional)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     data.name,
     data.description || null,
@@ -280,7 +278,6 @@ export function createComponent(data: {
     data.agent_id || null,
     data.human_role || null,
     data.icon || null,
-    data.execution || 'serial',
     data.optional ? 1 : 0
   );
   return result.lastInsertRowid as number;
@@ -294,7 +291,6 @@ export function updateComponent(id: number, data: {
   agent_id?: string;
   human_role?: string;
   icon?: string;
-  execution?: string;
   optional?: boolean;
 }): boolean {
   const db = getDb();
@@ -310,7 +306,6 @@ export function updateComponent(id: number, data: {
       agent_id = ?,
       human_role = ?,
       icon = ?,
-      execution = ?,
       optional = ?
     WHERE id = ?
   `).run(
@@ -321,7 +316,6 @@ export function updateComponent(id: number, data: {
     data.agent_id ?? existing.agent_id,
     data.human_role ?? existing.human_role,
     data.icon ?? existing.icon,
-    data.execution ?? existing.execution,
     data.optional !== undefined ? (data.optional ? 1 : 0) : existing.optional,
     id
   );

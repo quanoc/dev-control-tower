@@ -102,21 +102,21 @@ router.get('/components/:id', (req, res) => {
 
 // POST /api/pipelines/components - Create component
 router.post('/components', (req, res) => {
-  const { name, description, actor_type, action, agent_id, human_role, icon, execution, optional } = req.body;
+  const { name, description, actor_type, action, agent_id, human_role, icon, optional } = req.body;
   if (!name || !actor_type || !action) {
     return res.status(400).json({ error: 'name, actor_type, and action are required' });
   }
 
-  const id = queries.createComponent({ name, description, actor_type, action, agent_id, human_role, icon, execution, optional });
+  const id = queries.createComponent({ name, description, actor_type, action, agent_id, human_role, icon, optional });
   res.status(201).json({ id });
 });
 
 // PUT /api/pipelines/components/:id - Update component
 router.put('/components/:id', (req, res) => {
   const id = parseInt(req.params.id);
-  const { name, description, actor_type, action, agent_id, human_role, icon, execution, optional } = req.body;
+  const { name, description, actor_type, action, agent_id, human_role, icon, optional } = req.body;
 
-  const success = queries.updateComponent(id, { name, description, actor_type, action, agent_id, human_role, icon, execution, optional });
+  const success = queries.updateComponent(id, { name, description, actor_type, action, agent_id, human_role, icon, optional });
   if (!success) return res.status(404).json({ error: 'component not found' });
   res.json({ success: true });
 });
@@ -146,7 +146,6 @@ router.post('/components/generate-from-templates', (_req, res) => {
           step.agentId || '',
           step.humanRole || '',
           step.optional ? 'optional' : 'required',
-          step.execution,
         ].join('|');
 
         if (!stepKeyMap.has(key)) {
@@ -182,7 +181,6 @@ router.post('/components/generate-from-templates', (_req, res) => {
         agent_id: step.agentId || null,
         human_role: step.humanRole || null,
         icon,
-        execution: step.execution,
         optional: step.optional,
       });
       componentIdMap.set(key, componentId);
@@ -202,7 +200,6 @@ router.post('/components/generate-from-templates', (_req, res) => {
           step.agentId || '',
           step.humanRole || '',
           step.optional ? 'optional' : 'required',
-          step.execution,
         ].join('|');
 
         const componentId = componentIdMap.get(key);
