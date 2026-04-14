@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Edit2, X, Bot, RefreshCw, User, Sparkles } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Bot, RefreshCw, User, Sparkles, Tag } from 'lucide-react';
 import { api } from '../api/client';
 import type { Agent } from '@pipeline/shared';
 
 type AgentSource = 'all' | 'openclaw' | 'claude' | 'custom';
+
+// 预定义的标签列表
+const PREDEFINED_TAGS = ['需求', '设计', '开发', '测试', '文档', '部署'];
 
 const SOURCE_TABS: { key: AgentSource; label: string; icon: React.ReactNode }[] = [
   { key: 'all', label: '全部', icon: <Bot className="w-4 h-4" /> },
@@ -27,6 +30,7 @@ export function AgentLibrary() {
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<AgentSource>('all');
   const [search, setSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -59,6 +63,13 @@ export function AgentLibrary() {
     loadAgents();
   }, []);
 
+  // Toggle tag selection
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
   // Filter and sort agents: OpenClaw first, then Claude (limited), then Custom
   const filteredAgents = agents
     .filter(a => {
@@ -67,7 +78,10 @@ export function AgentLibrary() {
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.role.toLowerCase().includes(search.toLowerCase()) ||
         a.description?.toLowerCase().includes(search.toLowerCase());
-      return matchesTab && matchesSearch;
+      // Tag filter: match any selected tag
+      const matchesTags = selectedTags.length === 0 ||
+        selectedTags.some(tag => a.tags?.includes(tag));
+      return matchesTab && matchesSearch && matchesTags;
     })
     .sort((a, b) => {
       // OpenClaw first
@@ -164,7 +178,7 @@ export function AgentLibrary() {
       </div>
 
       {/* Search */}
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
         <input
           type="text"
@@ -173,6 +187,33 @@ export function AgentLibrary() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500"
         />
+      </div>
+
+      {/* Tag Filter */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <Tag className="w-4 h-4 text-gray-500" />
+        <span className="text-xs text-gray-500">筛选:</span>
+        {PREDEFINED_TAGS.map(tag => (
+          <button
+            key={tag}
+            onClick={() => toggleTag(tag)}
+            className={`px-2 py-1 text-xs rounded-full transition-colors ${
+              selectedTags.includes(tag)
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            {tag}
+          </button>
+        ))}
+        {selectedTags.length > 0 && (
+          <button
+            onClick={() => setSelectedTags([])}
+            className="text-xs text-gray-500 hover:text-gray-300 ml-2"
+          >
+            清除
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -312,6 +353,17 @@ function AgentCard({ agent, onEdit, onDelete }: {
         <p className="text-xs text-gray-500 mb-3 line-clamp-2">{agent.description}</p>
       )}
 
+      {/* Tags display */}
+      {agent.tags && agent.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {agent.tags.map(tag => (
+            <span key={tag} className="px-1.5 py-0.5 text-[10px] bg-gray-800 text-gray-400 rounded">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
       {agent.source === 'custom' && agent.model && (
         <div className="text-xs text-gray-600 mb-3">
           模型: <span className="text-gray-400">{agent.model}</span>
@@ -381,13 +433,14 @@ function AgentFormModal({ agent, onClose, onSuccess }: {
   const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku'>(agent?.model || 'sonnet');
   const [systemPrompt, setSystemPrompt] = useState(agent?.systemPrompt || '');
   const [icon, setIcon] = useState(agent?.icon || '');
+  const [selectedTags, setSelectedTags] = useState<string[]>(agent?.tags || []);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const data = { name, role, emoji, description, model, systemPrompt, icon };
+      const data = { name, role, emoji, description, model, systemPrompt, icon, tags: selectedTags };
       if (agent) {
         await api.agents.update(agent.id, data);
       } else {
@@ -471,6 +524,31 @@ function AgentFormModal({ agent, onClose, onSuccess }: {
               className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500"
               placeholder="描述这个 Agent 的用途..."
             />
+          </div>
+
+          {/* Tags selection */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-2">标签</label>
+            <div className="flex flex-wrap gap-2">
+              {PREDEFINED_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTags(prev =>
+                      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                    );
+                  }}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                    selectedTags.includes(tag)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>

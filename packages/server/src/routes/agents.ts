@@ -66,7 +66,7 @@ router.get('/openclaw', async (_req, res) => {
 
 // POST /api/agents - Create a custom agent
 router.post('/', (req, res) => {
-  const { name, role, emoji, description, model, systemPrompt, tools, icon } = req.body;
+  const { name, role, emoji, description, model, systemPrompt, tools, icon, tags } = req.body;
 
   if (!name || !role) {
     return res.status(400).json({ error: 'name and role are required' });
@@ -89,6 +89,7 @@ router.post('/', (req, res) => {
     systemPrompt: systemPrompt || '',
     tools: tools || [],
     icon,
+    tags: tags || [],
   });
 
   const agent = queries.getAgentById(agentId);
@@ -98,7 +99,7 @@ router.post('/', (req, res) => {
 // PUT /api/agents/:id - Update a custom agent
 router.put('/:id', (req, res) => {
   const { id } = req.params;
-  const { name, role, emoji, description, model, systemPrompt, tools, icon } = req.body;
+  const { name, role, emoji, description, model, systemPrompt, tools, icon, tags } = req.body;
 
   const existing = queries.getAgentById(id);
   if (!existing) {
@@ -120,6 +121,7 @@ router.put('/:id', (req, res) => {
     systemPrompt: systemPrompt ?? existing.systemPrompt,
     tools: tools ?? existing.tools,
     icon: icon ?? existing.icon,
+    tags: tags ?? existing.tags,
   });
 
   const agent = queries.getAgentById(id);

@@ -25,6 +25,7 @@ export interface Agent {
   systemPrompt?: string;
   tools?: string[];
   icon?: string;
+  tags?: string[];
 }
 
 export interface SkillEntry {

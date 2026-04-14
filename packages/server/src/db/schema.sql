@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS agents (
     tools TEXT DEFAULT '[]',                  -- allowed tools (claude/custom only)
     metadata TEXT DEFAULT '{}',                -- 额外信息 JSON
     last_sync TEXT,                            -- 最后同步时间
+    tags TEXT DEFAULT '[]',                   -- 标签数组 JSON
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

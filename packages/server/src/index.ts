@@ -9,6 +9,7 @@ import agentsRouter from './routes/agents.js';
 import tasksRouter from './routes/tasks.js';
 import pipelinesRouter from './routes/pipelines.js';
 import { DEFAULT_PIPELINE_PHASES } from '@pipeline/shared';
+import { initializeAgentTags } from './db/agent-sync.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || '/root/.openclaw/openclaw.json';
@@ -107,7 +108,7 @@ async function syncAllAgents(): Promise<void> {
       console.error('[Sync] Failed to sync Claude agents:', err);
     }
 
-    // Ensure default pipeline template exists
+// Ensure default pipeline template exists
     const templates = queries.getAllTemplates();
     if (templates.length === 0) {
       queries.createTemplate(
@@ -115,6 +116,30 @@ async function syncAllAgents(): Promise<void> {
         '完整的研发流水线：需求分析 → 架构设计 → 代码开发 → 测试验证 → 文档输出 → 部署上线',
         DEFAULT_PIPELINE_PHASES
       );
+    }
+
+    // Ensure default pipeline components exist
+    const components = queries.listComponents();
+    if (components.length === 0) {
+      console.log('[Init] Creating default pipeline components...');
+      // Agent actions
+      queries.createComponent({ name: '需求分析', description: '分析和拆解需求', actor_type: 'agent', action: 'analyze', icon: '📊' });
+      queries.createComponent({ name: '架构设计', description: '系统架构和技术设计', actor_type: 'agent', action: 'design', icon: '🏗️' });
+      queries.createComponent({ name: '代码开发', description: '编写和修改代码', actor_type: 'agent', action: 'code', icon: '💻' });
+      queries.createComponent({ name: '代码评审', description: '审查代码质量', actor_type: 'agent', action: 'review', icon: '👀' });
+      queries.createComponent({ name: '测试验证', description: '执行测试用例', actor_type: 'agent', action: 'test', icon: '🧪' });
+      queries.createComponent({ name: '文档输出', description: '生成技术文档', actor_type: 'agent', action: 'document', icon: '📚' });
+      queries.createComponent({ name: '部署上线', description: '部署到生产环境', actor_type: 'agent', action: 'deploy', icon: '🚀' });
+      // Human gates
+      queries.createComponent({ name: '审批', description: '必须通过的审批关卡', actor_type: 'human', action: 'approve', icon: '✅' });
+      queries.createComponent({ name: '评审', description: '人工评审环节', actor_type: 'human', action: 'review', icon: '👤' });
+      // System flows
+      queries.createComponent({ name: '代码检查', description: 'Lint 和静态分析', actor_type: 'system', action: 'lint', icon: '🔍' });
+      queries.createComponent({ name: '构建编译', description: '编译和构建流程', actor_type: 'system', action: 'build', icon: '⚙️' });
+      queries.createComponent({ name: '安全扫描', description: '安全漏洞扫描', actor_type: 'system', action: 'security_scan', icon: '🔒' });
+      queries.createComponent({ name: 'E2E 测试', description: '端到端自动化测试', actor_type: 'system', action: 'test_e2e', icon: '🖥️' });
+      queries.createComponent({ name: '代码拉取', description: '从仓库拉取代码', actor_type: 'system', action: 'code_pull', icon: '📥' });
+      queries.createComponent({ name: '代码合并', description: '合并目标分支代码', actor_type: 'system', action: 'code_merge', icon: '🔀' });
     }
 
     console.log(`[Sync] Synced ${agents.filter((a: any) => a.id !== 'main' && a.id !== 'claude').length} OpenClaw agents`);
@@ -130,7 +155,10 @@ async function start() {
   console.log('[Server] Database initialized');
 
   // Sync agents
-  syncAllAgents();
+  await syncAllAgents();
+
+  // Initialize tags for agents without tags (data migration)
+  initializeAgentTags();
 
   // Start server
   app.listen(PORT, () => {

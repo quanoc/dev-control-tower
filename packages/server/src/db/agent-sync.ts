@@ -6,6 +6,32 @@ import type { Agent } from '@pipeline/shared';
 
 const CLAUDE_AGENTS_DIR = join(process.env.HOME || '/root', '.claude', 'agents');
 
+// 预定义的标签及其匹配规则
+const TAG_RULES = [
+  { tag: '需求', patterns: ['pm', 'product', 'req', '需求', '产品', '产品经理'] },
+  { tag: '设计', patterns: ['arch', 'design', '架构', '设计', 'architect'] },
+  { tag: '开发', patterns: ['dev', 'code', '开发', '工程师', 'coder', 'developer', 'backend', 'frontend', 'fullstack'] },
+  { tag: '测试', patterns: ['test', 'qa', '测试', 'quality', '质量保证'] },
+  { tag: '文档', patterns: ['doc', 'writer', '文档', '写作', 'write', 'technical writer'] },
+  { tag: '部署', patterns: ['ops', 'deploy', '运维', '部署', 'devops', 'sre', 'infrastructure'] },
+];
+
+/**
+ * 根据 agent id/name/role/description 推断标签
+ */
+export function inferAgentTags(agentId: string, name: string, role: string, description: string): string[] {
+  const text = `${agentId} ${name} ${role} ${description}`.toLowerCase();
+  const tags: string[] = [];
+
+  for (const rule of TAG_RULES) {
+    if (rule.patterns.some(p => text.includes(p.toLowerCase()))) {
+      tags.push(rule.tag);
+    }
+  }
+
+  return [...new Set(tags)]; // 去重
+}
+
 interface OpenClawAgent {
   id: string;
   name: string;
@@ -42,9 +68,11 @@ export function syncAgents(): void {
     const openclawAgents: OpenClawAgent[] = JSON.parse(openclawData);
 
     for (const agent of openclawAgents) {
+      const tags = inferAgentTags(agent.id, agent.name, agent.name, agent.identityName || '');
+
       db.prepare(`
-        INSERT INTO agents (id, name, type, role, emoji, description, path, metadata, last_sync, updated_at)
-        VALUES (?, ?, 'openclaw', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO agents (id, name, type, role, emoji, description, path, metadata, last_sync, updated_at, tags)
+        VALUES (?, ?, 'openclaw', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           emoji = COALESCE(excluded.emoji, agents.emoji),
@@ -53,7 +81,8 @@ export function syncAgents(): void {
           metadata = excluded.metadata,
           last_sync = excluded.last_sync,
           type = 'openclaw',
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = CURRENT_TIMESTAMP,
+          tags = COALESCE(agents.tags, excluded.tags)
       `).run(
         agent.id,
         agent.name,
@@ -62,7 +91,8 @@ export function syncAgents(): void {
         agent.identityName || agent.name,
         agent.workspace || agent.agentDir,
         JSON.stringify({ model: agent.model }),
-        now
+        now,
+        JSON.stringify(tags)
       );
     }
     console.log(`[AgentSync] Synced ${openclawAgents.length} OpenClaw agents`);
@@ -103,23 +133,27 @@ export function syncAgents(): void {
             }
           }
 
+          const tags = inferAgentTags(agentId, name, name, description);
+
           db.prepare(`
-            INSERT INTO agents (id, name, type, role, description, metadata, last_sync, updated_at)
-            VALUES (?, ?, 'claude', ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO agents (id, name, type, role, description, metadata, last_sync, updated_at, tags)
+            VALUES (?, ?, 'claude', ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             ON CONFLICT(id) DO UPDATE SET
               name = excluded.name,
               description = COALESCE(excluded.description, agents.description),
               metadata = excluded.metadata,
               last_sync = excluded.last_sync,
               type = 'claude',
-              updated_at = CURRENT_TIMESTAMP
+              updated_at = CURRENT_TIMESTAMP,
+              tags = COALESCE(agents.tags, excluded.tags)
           `).run(
             agentId,
             name,
             name, // role (use name as default)
             description,
             JSON.stringify({ model, tools }),
-            now
+            now,
+            JSON.stringify(tags)
           );
           syncedCount++;
         } catch (err) {
@@ -190,5 +224,51 @@ function rowToAgent(row: any): Agent {
     systemPrompt: row.system_prompt,
     tools: JSON.parse(row.tools || '[]'),
     icon: row.emoji,
+    tags: JSON.parse(row.tags || '[]'),
   };
+}
+
+/**
+ * Initialize tags for existing agents that don't have tags.
+ * Called on server startup to migrate existing data.
+ */
+export function initializeAgentTags(): void {
+  const db = getDb();
+  console.log('[AgentSync] Initializing agent tags...');
+
+  try {
+    // Get all agents with empty or null tags
+    const rows = db.prepare(`
+      SELECT * FROM agents
+      WHERE tags IS NULL
+         OR tags = '[]'
+         OR tags = ''
+    `).all() as any[];
+
+    if (rows.length === 0) {
+      console.log('[AgentSync] All agents already have tags, skipping initialization');
+      return;
+    }
+
+    console.log(`[AgentSync] Found ${rows.length} agents without tags, inferring...`);
+
+    let updatedCount = 0;
+    for (const row of rows) {
+      const agent = rowToAgent(row);
+      const tags = inferAgentTags(agent.id, agent.name, agent.role, agent.description);
+
+      if (tags.length > 0) {
+        db.prepare('UPDATE agents SET tags = ? WHERE id = ?').run(
+          JSON.stringify(tags),
+          agent.id
+        );
+        updatedCount++;
+        console.log(`[AgentSync] Added tags [${tags.join(', ')}] to agent "${agent.name}" (${agent.id})`);
+      }
+    }
+
+    console.log(`[AgentSync] Initialized tags for ${updatedCount} agents`);
+  } catch (err) {
+    console.error('[AgentSync] Failed to initialize agent tags:', err);
+  }
 }

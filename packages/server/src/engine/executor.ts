@@ -5,9 +5,36 @@ import { stateMachine } from './statemachine.js';
 import * as queries from '../db/queries.js';
 import type { PipelineStage, PipelineInstance, StageRun, PipelinePhase, Agent } from '@pipeline/shared';
 import { DEFAULT_PIPELINE_STAGES, PHASES } from '@pipeline/shared';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+
+/**
+ * Validate and sanitize git repository URL
+ * Only allows HTTPS URLs and specific git SSH formats
+ */
+function validateRepoUrl(url: string): string | null {
+  // Allow https://github.com/user/repo.git format
+  const httpsRegex = /^https:\/\/[^\s"'`;|&$]+\.git$/i;
+  // Allow git@github.com:user/repo.git format
+  const sshRegex = /^git@[^\s"'`;|&$:]+:[^\s"'`;|&$]+\.git$/i;
+
+  if (httpsRegex.test(url)) return url;
+  if (sshRegex.test(url)) return url;
+  return null;
+}
+
+/**
+ * Validate branch name to prevent command injection
+ * Only allows alphanumeric, hyphen, underscore, dot, and slash
+ */
+function validateBranchName(branch: string): string | null {
+  const validBranchRegex = /^[a-zA-Z0-9._\-\/]+$/;
+  if (validBranchRegex.test(branch) && branch.length <= 255) {
+    return branch;
+  }
+  return null;
+}
 
 interface StageMeta {
   stageKey: string;
@@ -253,8 +280,8 @@ export class PipelineExecutor {
       
       // Extract branch (optional)
       const branchMatch = taskDesc.match(/branch[:\s]+(\w+)/i);
-      const branch = branchMatch ? branchMatch[1] : 'main';
-      
+      let branch = branchMatch ? branchMatch[1] : 'main';
+
       // Determine target directory
       const workspaceDir = '/root/.openclaw/workspace';
       const taskDir = task ? `task_${task.id}` : `pipeline_${instanceId}`;
@@ -276,29 +303,52 @@ export class PipelineExecutor {
         return true;
       }
       
+      // Validate inputs
+      const validatedRepoUrl = validateRepoUrl(repoUrl);
+      const validatedBranch = validateBranchName(branch);
+
+      if (!validatedRepoUrl) {
+        output = '仓库地址格式无效，跳过代码拉取\n\n' +
+                 '提示：使用有效的 HTTPS 或 SSH 格式，例如：\n' +
+                 'https://github.com/user/repo.git\n' +
+                 'git@github.com:user/repo.git';
+        queries.setStageRunOutput(stageRun.id, output);
+        queries.updateStageRunStatus(stageRun.id, 'completed');
+        await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+        console.log(`[Executor] Stage "${meta.label}" completed (invalid repo URL)`);
+        return true;
+      }
+
+      if (!validatedBranch) {
+        output = '分支名称格式无效，使用默认分支 main\n';
+        branch = 'main';
+      } else {
+        branch = validatedBranch;
+      }
+
       // Ensure target directory exists
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
-      
+
       // Check if it's already a git repo
       const gitDir = path.join(targetDir, '.git');
-      
+
       if (fs.existsSync(gitDir)) {
         // Pull latest changes
         output += `仓库已存在，执行 git pull...\n`;
-        const pullResult = execSync('git pull', { 
-          cwd: targetDir, 
+        const pullResult = execFileSync('git', ['pull'], {
+          cwd: targetDir,
           encoding: 'utf-8',
           timeout: 120000
         });
         output += pullResult || '已更新到最新版本\n';
       } else {
         // Clone repository
-        output += `正在克隆仓库: ${repoUrl}\n`;
+        output += `正在克隆仓库: ${validatedRepoUrl}\n`;
         output += `目标目录: ${targetDir}\n`;
         output += `分支: ${branch}\n\n`;
-        
+
         // Remove existing directory contents if any
         if (fs.existsSync(targetDir)) {
           const files = fs.readdirSync(targetDir);
@@ -307,18 +357,18 @@ export class PipelineExecutor {
             fs.rmSync(filePath, { recursive: true, force: true });
           }
         }
-        
-        const cloneResult = execSync(`git clone --branch ${branch} --single-branch ${repoUrl} .`, {
+
+        const cloneResult = execFileSync('git', ['clone', '--branch', branch, '--single-branch', validatedRepoUrl, '.'], {
           cwd: targetDir,
           encoding: 'utf-8',
           timeout: 300000
         });
         output += cloneResult || '克隆完成\n';
       }
-      
+
       // Get commit info
       try {
-        const commitInfo = execSync('git log -1 --oneline', {
+        const commitInfo = execFileSync('git', ['log', '-1', '--oneline'], {
           cwd: targetDir,
           encoding: 'utf-8'
         });
@@ -390,9 +440,21 @@ export class PipelineExecutor {
         return true;
       }
 
+      // Validate source branch
+      const validatedSourceBranch = validateBranchName(sourceBranch);
+      if (!validatedSourceBranch) {
+        output = '分支名称格式无效，跳过代码合并\n' +
+                 '提示：分支名称只能包含字母、数字、点、下划线、连字符和斜杠';
+        queries.setStageRunOutput(stageRun.id, output);
+        queries.updateStageRunStatus(stageRun.id, 'completed');
+        await stateMachine.transition('stage', stageRun.id, 'completed', 'system');
+        console.log(`[Executor] Stage "${meta.label}" completed (invalid branch name)`);
+        return true;
+      }
+
       // Fetch latest refs
       output += `获取远程分支信息...\n`;
-      const fetchResult = execSync('git fetch origin', {
+      const fetchResult = execFileSync('git', ['fetch', 'origin'], {
         cwd: targetDir,
         encoding: 'utf-8',
         timeout: 120000,
@@ -400,25 +462,25 @@ export class PipelineExecutor {
       output += fetchResult || '已获取最新分支信息\n';
 
       // Get current branch
-      const currentBranch = execSync('git branch --show-current', {
+      const currentBranch = execFileSync('git', ['branch', '--show-current'], {
         cwd: targetDir,
         encoding: 'utf-8',
       }).trim();
 
       output += `\n当前分支: ${currentBranch}\n`;
-      output += `合并分支: ${sourceBranch}\n`;
+      output += `合并分支: ${validatedSourceBranch}\n`;
 
       // Perform merge
-      const mergeResult = execSync(`git merge origin/${sourceBranch} --no-edit`, {
+      const mergeResult = execFileSync('git', ['merge', `origin/${validatedSourceBranch}`, '--no-edit'], {
         cwd: targetDir,
         encoding: 'utf-8',
         timeout: 120000,
       });
-      output += mergeResult || `成功合并 ${sourceBranch}\n`;
+      output += mergeResult || `成功合并 ${validatedSourceBranch}\n`;
 
       // Get latest commit info
       try {
-        const commitInfo = execSync('git log -1 --oneline', {
+        const commitInfo = execFileSync('git', ['log', '-1', '--oneline'], {
           cwd: targetDir,
           encoding: 'utf-8',
         });

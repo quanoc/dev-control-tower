@@ -29,21 +29,21 @@ export function getAgentById(id: string): Agent | undefined {
 export function upsertAgent(agent: Partial<Agent> & { id: string }): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO agents (id, name, role, emoji, description, workspace, agent_dir, skills, status, source, model, system_prompt, tools, icon)
+    INSERT INTO agents (id, name, role, emoji, description, path, skills, status, source, model, system_prompt, tools, icon, tags)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       role = excluded.role,
       emoji = excluded.emoji,
       description = excluded.description,
-      workspace = excluded.workspace,
-      agent_dir = excluded.agent_dir,
+      path = excluded.path,
       skills = excluded.skills,
       source = COALESCE(excluded.source, agents.source),
       model = COALESCE(excluded.model, agents.model),
       system_prompt = COALESCE(excluded.system_prompt, agents.system_prompt),
       tools = COALESCE(excluded.tools, agents.tools),
       icon = COALESCE(excluded.icon, agents.icon),
+      tags = COALESCE(excluded.tags, agents.tags),
       updated_at = CURRENT_TIMESTAMP
   `).run(
     agent.id,
@@ -51,15 +51,15 @@ export function upsertAgent(agent: Partial<Agent> & { id: string }): void {
     agent.role ?? '',
     agent.emoji ?? '',
     agent.description ?? '',
-    agent.workspace ?? '',
-    agent.agentDir ?? '',
+    agent.workspace ?? agent.agentDir ?? '',
     JSON.stringify(agent.skills ?? []),
     agent.status ?? 'idle',
     agent.source ?? 'openclaw',
     agent.model ?? null,
     agent.systemPrompt ?? null,
     JSON.stringify(agent.tools ?? []),
-    agent.icon ?? null
+    agent.icon ?? null,
+    JSON.stringify(agent.tags ?? [])
   );
 }
 
@@ -477,11 +477,12 @@ function rowToAgent(row: any): Agent {
     status: row.status as Agent['status'],
     currentTaskId: row.current_task_id,
     updatedAt: row.updated_at,
-    source: row.type || row.source || 'openclaw',  // Use type first, fallback to source for legacy
+    source: row.type || row.source || 'openclaw',
     model: row.model || undefined,
     systemPrompt: row.system_prompt || undefined,
     tools: JSON.parse(row.tools || '[]') as string[],
     icon: row.icon || undefined,
+    tags: JSON.parse(row.tags || '[]') as string[],
   };
 }
 
