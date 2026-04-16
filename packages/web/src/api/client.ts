@@ -65,6 +65,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ stageRunId }),
       }),
+    approveStage: (id: number, stageRunId: number) =>
+      request<any>(`/tasks/${id}/pipeline/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ stageRunId }),
+      }),
+    skipStage: (id: number, stageRunId: number) =>
+      request<any>(`/tasks/${id}/pipeline/skip`, {
+        method: 'POST',
+        body: JSON.stringify({ stageRunId }),
+      }),
   },
 
   // Pipelines

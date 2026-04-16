@@ -99,6 +99,21 @@ SQLite 数据库位置：`packages/server/data/pipeline.db`
 
 ## 注意事项
 
-1. 数据库文件已加入版本控制，避免数据丢失
+### 🔴 重要：数据库文件必须提交
+
+SQLite 数据库文件已**纳入版本控制**，这是项目的核心设计：
+
+- `packages/server/data/pipeline.db` - 主数据库文件（必须提交）
+- `packages/server/data/pipeline.db-shm` - 共享内存文件（必须提交）
+- `packages/server/data/pipeline.db-wal` - Write-Ahead Log 文件（必须提交）
+
+**原因**：
+- 避免开发环境数据丢失
+- 确保团队成员有一致的测试数据
+- 包含预设的流水线模板和 Agent 配置
+- git 可以正常处理 SQLite 二进制文件（不会损坏）
+
+### 其他注意事项
+
 2. Agent 同步需要 OpenClaw 环境变量配置
 3. 后端端口 3001，前端端口 5173

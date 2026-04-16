@@ -1,6 +1,6 @@
 import React from 'react';
-import type { StageRun, PipelinePhase } from '@pipeline/shared';
-import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, PauseCircle } from 'lucide-react';
+import type { StageRun, PipelinePhase, PipelineInstanceStatus } from '@pipeline/shared';
+import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, PauseCircle, AlertCircle, Clock } from 'lucide-react';
 import { PHASES } from '@pipeline/shared';
 
 interface PipelineFlowProps {
@@ -8,6 +8,7 @@ interface PipelineFlowProps {
   currentStageIndex: number;
   templatePhases?: PipelinePhase[];
   compact?: boolean;
+  pipelineStatus?: PipelineInstanceStatus;
 }
 
 const PHASE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -47,6 +48,12 @@ function getStatusIcon(status: string, label: string) {
           <XCircle className="w-3.5 h-3.5 text-red-400" />
         </div>
       );
+    case 'waiting_approval':
+      return (
+        <div className="w-6 h-6 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center animate-pulse" title={`${label}: 等待审批`}>
+          <Clock className="w-3.5 h-3.5 text-amber-400" />
+        </div>
+      );
     case 'skipped':
       return (
         <div className="w-6 h-6 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center" title={`${label}: 跳过`}>
@@ -62,13 +69,16 @@ function getStatusIcon(status: string, label: string) {
   }
 }
 
-export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, compact = false }: PipelineFlowProps) {
+export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, compact = false, pipelineStatus }: PipelineFlowProps) {
   if (stageRuns.length === 0) {
     return <span className="text-sm text-gray-500">无流水线</span>;
   }
 
   // Create a map from stageKey to stageRun for quick lookup
   const stageRunMap = new Map(stageRuns.map(sr => [sr.stageKey, sr]));
+
+  // Find blocking stage (waiting_approval or failed)
+  const blockingStage = stageRuns.find(sr => sr.status === 'waiting_approval' || sr.status === 'failed');
 
   // If templatePhases provided, use that structure
   const displayPhases = templatePhases && templatePhases.length > 0
@@ -100,8 +110,39 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
         }));
       })();
 
+  // Get blocking reason message
+  const getBlockingMessage = () => {
+    if (!blockingStage) return null;
+    const stageLabel = blockingStage.stepLabel || blockingStage.stageKey;
+    if (blockingStage.status === 'waiting_approval') {
+      return { type: 'warning' as const, message: `⏸️ 等待审批：${stageLabel}`, error: undefined };
+    }
+    if (blockingStage.status === 'failed') {
+      return { type: 'error' as const, message: `❌ 执行失败：${stageLabel}`, error: blockingStage.error };
+    }
+    return null;
+  };
+  const blockingInfo = getBlockingMessage();
+
   return (
     <div className={`overflow-x-auto ${compact ? 'scale-90 origin-left' : ''}`}>
+      {/* Pipeline status banner */}
+      {blockingInfo && (
+        <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
+          blockingInfo.type === 'warning'
+            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+            : 'bg-red-500/10 border border-red-500/30 text-red-400'
+        }`}>
+          <AlertCircle className="w-4 h-4" />
+          {blockingInfo.message}
+          {blockingInfo.error && (
+            <span className="text-gray-500 ml-2 truncate max-w-xs" title={blockingInfo.error}>
+              — {blockingInfo.error.substring(0, 50)}...
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-start gap-2 min-w-max">
         {displayPhases.map((phase, phaseIdx) => {
           const colors = getPhaseColor(phase.phaseKey);
@@ -130,6 +171,7 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
                           status === 'running' ? 'bg-blue-500/20 border-blue-500/50' :
                           status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/50' :
                           status === 'failed' ? 'bg-red-500/20 border-red-500/50' :
+                          status === 'waiting_approval' ? 'bg-amber-500/20 border-amber-500/50 animate-pulse' :
                           'bg-gray-800 border-gray-700'
                         }`}
                         title={`${label}: ${status}`}
@@ -139,6 +181,7 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
                           status === 'running' ? 'text-blue-400 font-medium' :
                           status === 'completed' ? 'text-emerald-400' :
                           status === 'failed' ? 'text-red-400' :
+                          status === 'waiting_approval' ? 'text-amber-400 font-medium' :
                           'text-gray-400'
                         }`}>
                           {label}

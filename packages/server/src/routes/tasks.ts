@@ -28,18 +28,27 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/tasks - Create new task
-router.post('/', (req, res) => {
-  const { title, description, templateId } = req.body;
+router.post('/', async (req, res) => {
+  const { title, description, templateId, autoStart } = req.body;
   if (!title) return res.status(400).json({ error: 'title is required' });
 
   const taskId = queries.createTask(title, description || '');
 
   // If template specified, create pipeline instance
+  let instanceId: number | undefined;
   if (templateId) {
     const template = queries.getTemplateById(templateId);
     if (template) {
-      queries.createPipelineInstance(taskId, templateId, template.stages);
+      instanceId = queries.createPipelineInstance(taskId, templateId, template.stages);
     }
+  }
+
+  // Auto-start if requested
+  if (autoStart && instanceId) {
+    // 异步启动，不阻塞响应
+    pipelineExecutor.start(instanceId).catch(err => {
+      console.error(`[Tasks] Failed to auto-start pipeline ${instanceId}:`, err);
+    });
   }
 
   const task = queries.getTaskById(taskId);
@@ -55,8 +64,9 @@ router.put('/:id/status', (req, res) => {
     queries.updateTaskStatus(Number(req.params.id), status);
     const task = queries.getTaskById(Number(req.params.id));
     res.json(task);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
   }
 });
 
@@ -69,8 +79,9 @@ router.post('/:id/pipeline/start', async (req, res) => {
 
     await pipelineExecutor.start(instance.id);
     res.json({ message: 'Pipeline started', instanceId: instance.id });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 
@@ -85,8 +96,74 @@ router.post('/:id/pipeline/retry', async (req, res) => {
 
     await pipelineExecutor.retryStage(instance.id, stageRunId);
     res.json({ message: 'Stage retry initiated' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/approve - Approve a waiting human gate
+router.post('/:id/pipeline/approve', async (req, res) => {
+  try {
+    const { stageRunId, comment } = req.body;
+    if (!stageRunId) return res.status(400).json({ error: 'stageRunId is required' });
+
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.approveStage(instance.id, stageRunId, comment);
+    res.json({ message: 'Stage approved, pipeline resumed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/reject - Reject a waiting human gate
+router.post('/:id/pipeline/reject', async (req, res) => {
+  try {
+    const { stageRunId, comment } = req.body;
+    if (!stageRunId) return res.status(400).json({ error: 'stageRunId is required' });
+
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.rejectStage(instance.id, stageRunId, comment);
+    res.json({ message: 'Stage rejected, pipeline failed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/skip - Skip a failed stage and continue
+router.post('/:id/pipeline/skip', async (req, res) => {
+  try {
+    const { stageRunId } = req.body;
+    if (!stageRunId) return res.status(400).json({ error: 'stageRunId is required' });
+
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.skipStage(instance.id, stageRunId);
+    res.json({ message: 'Stage skipped, pipeline resumed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/stop - Stop a running pipeline
+router.post('/:id/pipeline/stop', async (req, res) => {
+  try {
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.stop(instance.id);
+    res.json({ message: 'Pipeline stopped' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 
@@ -96,8 +173,9 @@ router.delete('/:id', (req, res) => {
   try {
     queries.deleteTask(id);
     res.status(204).send();
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 

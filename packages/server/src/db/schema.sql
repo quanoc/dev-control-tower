@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS pipeline_stage_runs (
     artifacts TEXT DEFAULT '[]',
     started_at DATETIME,
     completed_at DATETIME,
+    heartbeat_at DATETIME,
+    timeout_seconds INTEGER DEFAULT 300,
     error TEXT
 );
 

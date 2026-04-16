@@ -10,6 +10,7 @@ import tasksRouter from './routes/tasks.js';
 import pipelinesRouter from './routes/pipelines.js';
 import { DEFAULT_PIPELINE_PHASES } from '@pipeline/shared';
 import { initializeAgentTags } from './db/agent-sync.js';
+import { pipelineScheduler } from './engine/scheduler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || '/root/.openclaw/openclaw.json';
@@ -30,17 +31,59 @@ app.use('/api/pipelines', pipelinesRouter);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
-app.get('/api/agents/:id/identity', (req, res) => {
+app.get('/api/agents/:id/definitions', (req, res) => {
   try {
     const agent = queries.getAgentById(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
+    const result: {
+      identity?: string;
+      agents?: string;
+      soul?: string;
+      tools?: string;
+      bootstrap?: string;
+      heartbeat?: string;
+      user?: string;
+    } = {};
+
+    // 1. IDENTITY.md - agent 自己的目录
     const identityPath = join(agent.agentDir, 'IDENTITY.md');
-    if (!existsSync(identityPath)) {
-      return res.json({ content: '', description: '' });
+    if (existsSync(identityPath)) {
+      result.identity = readFileSync(identityPath, 'utf-8');
     }
-    const content = readFileSync(identityPath, 'utf-8');
-    res.json({ content });
+
+    // Agent 自己的工作目录
+    const AGENT_WORKSPACE = agent.workspace;
+
+    // 辅助函数：只从 agent workspace 读，没有返回 undefined
+    const readAgentFile = (filename: string): string | undefined => {
+      if (!AGENT_WORKSPACE) return undefined;
+      const agentPath = join(AGENT_WORKSPACE, filename);
+      if (existsSync(agentPath)) {
+        return readFileSync(agentPath, 'utf-8');
+      }
+      return undefined;
+    };
+
+    // 2. AGENTS.md
+    result.agents = readAgentFile('AGENTS.md');
+
+    // 3. SOUL.md
+    result.soul = readAgentFile('SOUL.md');
+
+    // 4. TOOLS.md
+    result.tools = readAgentFile('TOOLS.md');
+
+    // 5. BOOTSTRAP.md
+    result.bootstrap = readAgentFile('BOOTSTRAP.md');
+
+    // 6. HEARTBEAT.md
+    result.heartbeat = readAgentFile('HEARTBEAT.md');
+
+    // 7. USER.md
+    result.user = readAgentFile('USER.md');
+
+    res.json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });
@@ -120,7 +163,7 @@ async function syncAllAgents(): Promise<void> {
 
     // Ensure default pipeline components exist
     const components = queries.listComponents();
-    if (components.length === 0) {
+    if (components.total === 0) {
       console.log('[Init] Creating default pipeline components...');
       // Agent actions
       queries.createComponent({ name: '需求分析', description: '分析和拆解需求', actor_type: 'agent', action: 'analyze', icon: '📊' });
@@ -160,6 +203,10 @@ async function start() {
   // Initialize tags for agents without tags (data migration)
   initializeAgentTags();
 
+  // Start pipeline scheduler (恢复卡住的流水线 + 超时检测)
+  pipelineScheduler.start();
+  console.log('[Server] Pipeline scheduler started');
+
   // Start server
   app.listen(PORT, () => {
     console.log(`[Server] Listening on http://localhost:${PORT}`);
@@ -169,6 +216,7 @@ async function start() {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('[Server] Shutting down...');
+  pipelineScheduler.stop();
   closeDb();
   process.exit(0);
 });

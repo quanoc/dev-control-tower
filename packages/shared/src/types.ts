@@ -188,6 +188,8 @@ export interface PipelineStage {
   phaseKey: PhaseKey;
   /** Batch index this stage belongs to within its phase */
   batchIndex?: number;
+  /** Optional reference to a reusable pipeline component */
+  componentId?: number;
   // ─── Backward compatibility (legacy v1 fields) ───────────
   /** @deprecated Use actorType + action instead */
   type?: 'agent_action' | 'human_approval' | 'fixed_flow';

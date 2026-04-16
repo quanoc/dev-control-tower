@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { PipelineFlow } from './PipelineFlow';
 import { useTaskStore } from '../store/tasks';
 
-const TASK_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+const TASK_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor?: string }> = {
   pending:    { label: '待启动', color: 'text-gray-400' },
   running:    { label: '进行中', color: 'text-blue-400' },
   completed:  { label: '已完成', color: 'text-emerald-400' },
   failed:     { label: '失败',   color: 'text-red-400' },
   cancelled:  { label: '已取消', color: 'text-gray-600' },
+  paused:     { label: '已暂停', color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -29,10 +30,27 @@ const PHASE_LABELS: Record<string, string> = {
   deployment:    '上线阶段',
 };
 
-function getCurrentStage(pipeline: PipelineInstance | null): { label: string; progress: string } {
+function getCurrentStage(pipeline: PipelineInstance | null): { label: string; progress: string; reason?: string; blocked?: boolean } {
   if (!pipeline) return { label: '—', progress: '' };
   if (pipeline.status === 'completed') return { label: '全部完成', progress: `${pipeline.stageRuns.length}/${pipeline.stageRuns.length}` };
-  if (pipeline.status === 'failed') return { label: '流程中断', progress: `${pipeline.currentStageIndex}/${pipeline.stageRuns.length}` };
+  if (pipeline.status === 'failed') {
+    const failedStage = pipeline.stageRuns.find(s => s.status === 'failed');
+    return {
+      label: '执行失败',
+      progress: `${pipeline.currentStageIndex + 1}/${pipeline.stageRuns.length}`,
+      reason: failedStage?.error || '未知错误',
+      blocked: true
+    };
+  }
+  if (pipeline.status === 'paused') {
+    const waitingStage = pipeline.stageRuns.find(s => s.status === 'waiting_approval');
+    return {
+      label: waitingStage ? `等待审批: ${waitingStage.stepLabel || waitingStage.stageKey}` : '已暂停',
+      progress: `${pipeline.currentStageIndex + 1}/${pipeline.stageRuns.length}`,
+      reason: waitingStage ? '需要人工确认后继续' : '流水线已暂停',
+      blocked: true
+    };
+  }
   if (pipeline.status === 'pending') return { label: '待启动', progress: `0/${pipeline.stageRuns.length}` };
   const current = pipeline.stageRuns[pipeline.currentStageIndex];
   const label = current ? STAGE_LABELS[current.stageKey] || current.stageKey : '—';
@@ -44,9 +62,11 @@ interface PipelineModalProps {
   pipeline: PipelineInstance;
   onClose: () => void;
   onRetry?: (stageRunId: number) => void;
+  onSkip?: (stageRunId: number) => void;
+  onApprove?: (stageRunId: number) => void;
 }
 
-function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
+function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: PipelineModalProps) {
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onClose} />
@@ -94,7 +114,7 @@ function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
                 </thead>
                 <tbody>
                   {pipeline.stageRuns.map((stage, i) => (
-                    <StageRow key={stage.id} stage={stage} index={i} onRetry={onRetry} />
+                    <StageRow key={stage.id} stage={stage} index={i} onRetry={onRetry} onSkip={onSkip} onApprove={onApprove} />
                   ))}
                 </tbody>
               </table>
@@ -107,14 +127,15 @@ function PipelineModal({ pipeline, onClose, onRetry }: PipelineModalProps) {
 }
 
 const STAGE_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
-  completed: { label: '已完成', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
-  running:   { label: '执行中', bg: 'bg-blue-500/15',   text: 'text-blue-400' },
-  failed:    { label: '失败',   bg: 'bg-red-500/15',    text: 'text-red-400' },
-  skipped:   { label: '跳过',   bg: 'bg-gray-800',      text: 'text-gray-500' },
-  pending:   { label: '待执行', bg: 'bg-gray-800',      text: 'text-gray-500' },
+  completed:        { label: '已完成', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  running:          { label: '执行中', bg: 'bg-blue-500/15',   text: 'text-blue-400' },
+  failed:           { label: '失败',   bg: 'bg-red-500/15',    text: 'text-red-400' },
+  skipped:          { label: '跳过',   bg: 'bg-gray-800',      text: 'text-gray-500' },
+  pending:          { label: '待执行', bg: 'bg-gray-800',      text: 'text-gray-500' },
+  waiting_approval: { label: '待审批', bg: 'bg-amber-500/15',  text: 'text-amber-400' },
 };
 
-function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; onRetry?: (id: number) => void }) {
+function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRun; index: number; onRetry?: (id: number) => void; onSkip?: (id: number) => void; onApprove?: (id: number) => void }) {
   const status = STAGE_STATUS_MAP[stage.status] || STAGE_STATUS_MAP.pending;
   const stepLabel = stage.stepLabel || stage.stageKey;
   const phaseLabel = stage.phaseKey ? (PHASE_LABELS[stage.phaseKey] || stage.phaseKey) : '—';
@@ -140,20 +161,35 @@ function StageRow({ stage, index, onRetry }: { stage: StageRun; index: number; o
       </td>
       <td className="px-3 py-2.5 text-gray-500 font-mono">{duration}</td>
       <td className="px-3 py-2.5">
-        {stage.error ? (
+        {stage.status === 'waiting_approval' && onApprove ? (
+          <button
+            onClick={() => onApprove(stage.id)}
+            className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+          >
+            通过
+          </button>
+        ) : stage.status === 'failed' ? (
           <div className="flex items-center gap-2">
-            <span className="text-red-400 truncate">{stage.error.substring(0, 60)}</span>
+            <span className="text-red-400 truncate max-w-[120px]" title={stage.error ?? undefined}>{stage.error?.substring(0, 40) ?? '未知错误'}...</span>
             {onRetry && (
               <button
                 onClick={() => onRetry(stage.id)}
-                className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0"
+                className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0 px-1.5 py-0.5 bg-blue-500/10 rounded"
               >
                 重试
               </button>
             )}
+            {onSkip && (
+              <button
+                onClick={() => onSkip(stage.id)}
+                className="text-xs text-gray-400 hover:text-gray-300 flex-shrink-0 px-1.5 py-0.5 bg-gray-700 rounded"
+              >
+                跳过
+              </button>
+            )}
           </div>
         ) : stage.output ? (
-          <span className="text-gray-400 truncate">{stage.output.substring(0, 60)}</span>
+          <span className="text-gray-400 truncate max-w-[180px]" title={stage.output}>{stage.output.substring(0, 50)}...</span>
         ) : (
           <span className="text-gray-700">—</span>
         )}
@@ -169,6 +205,9 @@ interface TaskRowProps {
 function TaskRow({ task }: TaskRowProps) {
   const [showPipeline, setShowPipeline] = useState(false);
   const startPipeline = useTaskStore(s => s.startTaskPipeline);
+  const approveTaskStage = useTaskStore(s => s.approveTaskStage);
+  const retryTaskStage = useTaskStore(s => s.retryTaskStage);
+  const skipTaskStage = useTaskStore(s => s.skipTaskStage);
   const [starting, setStarting] = useState(false);
 
   const pipeline = task.pipeline;
@@ -181,6 +220,19 @@ function TaskRow({ task }: TaskRowProps) {
       await startPipeline(task.id);
     } finally {
       setStarting(false);
+    }
+  };
+
+  const waitingStage = pipeline?.stageRuns?.find(s => s.status === 'waiting_approval');
+  const [approving, setApproving] = useState(false);
+
+  const handleApprove = async () => {
+    if (!waitingStage) return;
+    setApproving(true);
+    try {
+      await approveTaskStage(task.id, waitingStage.id);
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -217,9 +269,16 @@ function TaskRow({ task }: TaskRowProps) {
         </td>
 
         {/* Current Stage */}
-        <td className="px-4 py-3 w-36">
+        <td className="px-4 py-3 w-40">
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-gray-300">{currentStage.label}</span>
+            <span className={`text-xs ${currentStage.blocked ? 'text-amber-400 font-medium' : 'text-gray-300'}`}>
+              {currentStage.label}
+            </span>
+            {currentStage.reason && (
+              <span className="text-[10px] text-gray-500 truncate" title={currentStage.reason}>
+                {currentStage.reason}
+              </span>
+            )}
             {currentStage.progress && (
               <div className="flex items-center gap-1.5">
                 {(() => {
@@ -228,7 +287,10 @@ function TaskRow({ task }: TaskRowProps) {
                   return (
                     <>
                       <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${currentStage.blocked ? 'bg-amber-500' : 'bg-blue-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                       <span className="text-[10px] text-gray-500 font-mono">{currentStage.progress}</span>
                     </>
@@ -259,6 +321,16 @@ function TaskRow({ task }: TaskRowProps) {
                 启动
               </button>
             )}
+            {waitingStage && (
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-800 disabled:text-gray-600 rounded text-xs font-medium transition-colors text-gray-200"
+              >
+                {approving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                审批
+              </button>
+            )}
             <button
               className="flex items-center gap-1 px-2 py-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded text-xs transition-colors"
               title="查看详情"
@@ -287,6 +359,9 @@ function TaskRow({ task }: TaskRowProps) {
         <PipelineModal
           pipeline={pipeline}
           onClose={() => setShowPipeline(false)}
+          onRetry={(stageRunId) => retryTaskStage(task.id, stageRunId)}
+          onSkip={(stageRunId) => skipTaskStage(task.id, stageRunId)}
+          onApprove={(stageRunId) => approveTaskStage(task.id, stageRunId)}
         />
       )}
     </>

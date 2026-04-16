@@ -1,4 +1,8 @@
 import { getDb } from './index.js';
+
+// 导出 getDb 供其他模块直接操作数据库
+export { getDb };
+
 import type {
   Agent,
   SkillEntry,
@@ -35,7 +39,7 @@ export function upsertAgent(agent: Partial<Agent> & { id: string }): void {
       name = excluded.name,
       role = excluded.role,
       emoji = excluded.emoji,
-      description = excluded.description,
+      description = COALESCE(NULLIF(excluded.description, ''), agents.description),
       path = excluded.path,
       skills = excluded.skills,
       source = COALESCE(excluded.source, agents.source),
@@ -406,6 +410,28 @@ export function getStageRun(instanceId: number, stageKey: string): StageRun | un
   return row ? rowToStageRun(row) : undefined;
 }
 
+export function getStageRunById(id: number): StageRun | undefined {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM pipeline_stage_runs WHERE id = ?').get(id) as any;
+  return row ? rowToStageRun(row) : undefined;
+}
+
+export function updateStageRunHeartbeat(id: number): void {
+  const db = getDb();
+  db.prepare('UPDATE pipeline_stage_runs SET heartbeat_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+}
+
+export function getTimedOutStageRuns(timeoutSeconds: number = 300): StageRun[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT * FROM pipeline_stage_runs
+    WHERE status = 'running'
+    AND started_at IS NOT NULL
+    AND datetime(started_at, '+' || ? || ' seconds') < datetime('now')
+  `).all(timeoutSeconds) as any[];
+  return rows.map(rowToStageRun);
+}
+
 export function updateStageRunStatus(id: number, status: string, error?: string): void {
   const db = getDb();
   const now = status === 'running' ? new Date().toISOString() : null;
@@ -471,8 +497,8 @@ function rowToAgent(row: any): Agent {
     role: row.role,
     emoji: row.emoji,
     description: row.description,
-    workspace: row.workspace,
-    agentDir: row.agent_dir,
+    workspace: row.path || '',
+    agentDir: row.path || '',
     skills: JSON.parse(row.skills || '[]') as SkillEntry[],
     status: row.status as Agent['status'],
     currentTaskId: row.current_task_id,

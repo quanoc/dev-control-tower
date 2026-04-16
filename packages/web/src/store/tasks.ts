@@ -10,6 +10,9 @@ interface TaskStore {
   fetchTasks: () => Promise<void>;
   createTask: (title: string, description: string, templateId?: number) => Promise<void>;
   startTaskPipeline: (id: number) => Promise<void>;
+  approveTaskStage: (id: number, stageRunId: number) => Promise<void>;
+  retryTaskStage: (id: number, stageRunId: number) => Promise<void>;
+  skipTaskStage: (id: number, stageRunId: number) => Promise<void>;
   setFilter: (status: string | null) => void;
 }
 
@@ -36,7 +39,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   startTaskPipeline: async (id) => {
     await api.tasks.startPipeline(id);
-    // Refresh tasks to get updated status
+    await get().fetchTasks();
+  },
+
+  approveTaskStage: async (id, stageRunId) => {
+    await api.tasks.approveStage(id, stageRunId);
+    await get().fetchTasks();
+  },
+
+  retryTaskStage: async (id, stageRunId) => {
+    await api.tasks.retryStage(id, stageRunId);
+    await get().fetchTasks();
+  },
+
+  skipTaskStage: async (id, stageRunId) => {
+    await api.tasks.skipStage(id, stageRunId);
     await get().fetchTasks();
   },
 

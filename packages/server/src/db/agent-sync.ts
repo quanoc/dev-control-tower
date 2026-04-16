@@ -68,7 +68,34 @@ export function syncAgents(): void {
     const openclawAgents: OpenClawAgent[] = JSON.parse(openclawData);
 
     for (const agent of openclawAgents) {
-      const tags = inferAgentTags(agent.id, agent.name, agent.name, agent.identityName || '');
+      // Read IDENTITY.md for description
+      let description = agent.identityName || agent.name;
+      try {
+        const identityPath = join(agent.agentDir, 'IDENTITY.md');
+        if (existsSync(identityPath)) {
+          const identityContent = readFileSync(identityPath, 'utf-8');
+          // Extract description from IDENTITY.md (use full content or first meaningful section)
+          const descMatch = identityContent.match(/## 专业领域[\s\S]*?(?=##|$)/);
+          if (descMatch) {
+            description = descMatch[0].replace(/## 专业领域/, '').trim();
+          } else {
+            // Use content after frontmatter if no specific section
+            const contentMatch = identityContent.match(/^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)/);
+            if (contentMatch) {
+              description = contentMatch[1].trim().slice(0, 200);
+            }
+          }
+        }
+      } catch {
+        // Fallback to identityName or name
+      }
+
+      const tags = inferAgentTags(agent.id, agent.name, agent.name, description);
+
+      // Determine workspace: main agent uses public workspace, others use their own workspace
+      const workspace = agent.id === 'main'
+        ? join(process.env.HOME || '/root', '.openclaw', 'workspace')
+        : agent.workspace || agent.agentDir;
 
       db.prepare(`
         INSERT INTO agents (id, name, type, role, emoji, description, path, metadata, last_sync, updated_at, tags)
@@ -76,7 +103,7 @@ export function syncAgents(): void {
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           emoji = COALESCE(excluded.emoji, agents.emoji),
-          description = COALESCE(excluded.description, agents.description),
+          description = excluded.description,
           path = excluded.path,
           metadata = excluded.metadata,
           last_sync = excluded.last_sync,
@@ -88,8 +115,8 @@ export function syncAgents(): void {
         agent.name,
         agent.name, // role (use name as default)
         agent.identityEmoji || '',
-        agent.identityName || agent.name,
-        agent.workspace || agent.agentDir,
+        description,
+        workspace, // Use agentDir (not workspace) for IDENTITY.md
         JSON.stringify({ model: agent.model }),
         now,
         JSON.stringify(tags)

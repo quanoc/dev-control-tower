@@ -40,6 +40,23 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-5 py-4 space-y-5">
+            {/* Source */}
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">来源</h4>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium ${
+                agent.source === 'openclaw'
+                  ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                  : agent.source === 'claude'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {agent.source === 'openclaw' && <span>🦀</span>}
+                {agent.source === 'claude' && <span>✨</span>}
+                {agent.source === 'custom' && <span>👤</span>}
+                {agent.source === 'openclaw' ? 'OpenClaw' : agent.source === 'claude' ? 'Claude' : '自定义'}
+              </span>
+            </div>
+
             {/* Skills */}
             {agent.skills && agent.skills.length > 0 && (
               <div>
@@ -73,8 +90,8 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
               </div>
             )}
 
-            {/* IDENTITY.md content */}
-            <IdentityContent agentId={agent.id} />
+            {/* Agent Definitions */}
+            <AgentDefinitions agentId={agent.id} />
 
             {/* Workspace info */}
             {agent.workspace && (
@@ -90,28 +107,54 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
   );
 }
 
-interface IdentityContentProps {
+interface AgentDefinitionsProps {
   agentId: string;
 }
 
-function IdentityContent({ agentId }: IdentityContentProps) {
-  const [content, setContent] = useState<string | null>(null);
+interface DefinitionsData {
+  identity?: string;
+  agents?: string;
+  soul?: string;
+  tools?: string;
+  bootstrap?: string;
+  heartbeat?: string;
+  user?: string;
+}
+
+const FILE_LABELS: Record<string, string> = {
+  identity: '身份定义',
+  agents: 'Agent 配置',
+  soul: '灵魂配置',
+  tools: '工具配置',
+  bootstrap: '启动配置',
+  heartbeat: '心跳配置',
+  user: '用户配置',
+};
+
+function AgentDefinitions({ agentId }: AgentDefinitionsProps) {
+  const [definitions, setDefinitions] = useState<DefinitionsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/agents/${agentId}/identity`)
+    fetch(`/api/agents/${agentId}/definitions`)
       .then(res => res.json())
-      .then(data => {
+      .then((data: DefinitionsData) => {
         if (!cancelled) {
-          setContent(data.content || '');
+          setDefinitions(data);
+          // 默认展开第一个
+          const firstKey = Object.keys(data)[0];
+          if (firstKey) {
+            setExpanded({ [firstKey]: true });
+          }
           setLoading(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setContent(null);
+          setDefinitions(null);
           setLoading(false);
         }
       });
@@ -130,16 +173,33 @@ function IdentityContent({ agentId }: IdentityContentProps) {
     );
   }
 
-  if (!content) {
+  if (!definitions || Object.keys(definitions).length === 0) {
     return null;
   }
 
   return (
     <div>
       <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Agent 定义</h4>
-      <pre className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
-        {content}
-      </pre>
+      <div className="space-y-2">
+        {Object.entries(definitions).map(([key, content]) => (
+          <div key={key} className="border border-gray-800 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+              className="w-full flex items-center justify-between px-3 py-2 bg-gray-800/50 hover:bg-gray-800 text-left"
+            >
+              <span className="text-xs font-medium text-gray-300">{FILE_LABELS[key] || key}</span>
+              <span className="text-xs text-gray-500">{expanded[key] ? '▼' : '▶'}</span>
+            </button>
+            {expanded[key] && (
+              <pre className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-gray-900">
+                {content}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+// Legacy component - can be removed

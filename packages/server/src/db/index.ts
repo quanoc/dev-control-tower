@@ -49,6 +49,16 @@ export function getDb(): Database.Database {
         "ALTER TABLE pipeline_stage_runs ADD COLUMN step_label TEXT"
       );
     }
+    if (!stageRunsColumns.some(c => c.name === 'heartbeat_at')) {
+      db.exec(
+        "ALTER TABLE pipeline_stage_runs ADD COLUMN heartbeat_at DATETIME"
+      );
+    }
+    if (!stageRunsColumns.some(c => c.name === 'timeout_seconds')) {
+      db.exec(
+        "ALTER TABLE pipeline_stage_runs ADD COLUMN timeout_seconds INTEGER DEFAULT 300"
+      );
+    }
 
     // Migrate agents table for multi-agent support
     const agentsColumns = db.prepare(
