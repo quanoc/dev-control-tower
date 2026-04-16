@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Agent } from '@pipeline/shared';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AgentBarProps {
   agents: Agent[];
@@ -18,9 +18,13 @@ const PIPELINE_ORDER = [
   'xiaoyun-ops',
 ];
 
+// Main agent (林诺) always comes first as the commander
+const MAIN_AGENT_ID = 'main';
+
 const CLAUDE_SHOWN_LIMIT = 2;
 
 const ROLE_LABELS: Record<string, string> = {
+  'main':           'OpenClaw 主 Agent',
   'xiaoxi-pm':      '需求评审',
   'zhangjia-arch':  '架构设计',
   'magerd':         '代码开发',
@@ -30,6 +34,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_TYPE: Record<string, string> = {
+  'main':           '指挥官',
   'xiaoxi-pm':      'PM',
   'zhangjia-arch':  'AR',
   'magerd':         'RD',
@@ -71,8 +76,12 @@ function groupAgents(agents: Agent[]): GroupedAgents {
     }
   }
 
-  // Sort OpenClaw by pipeline order
+  // Sort OpenClaw by pipeline order, with main agent first
   result.openclaw.sort((a, b) => {
+    // Main agent (林诺) always comes first
+    if (a.id === MAIN_AGENT_ID) return -1;
+    if (b.id === MAIN_AGENT_ID) return 1;
+
     const ai = PIPELINE_ORDER.indexOf(a.id);
     const bi = PIPELINE_ORDER.indexOf(b.id);
     // Put ordered ones first, then unordered ones
@@ -153,7 +162,7 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
   // Combine: OpenClaw + visible Claude + others
   const displayAgents = [...grouped.openclaw, ...visibleClaude, ...grouped.others];
 
-  // 计算布局模式
+  // 计算布局模式（基于初始状态）
   useEffect(() => {
     const container = containerRef.current;
     const measureEl = measureRef.current;
@@ -177,7 +186,19 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
     const resizeObserver = new ResizeObserver(checkLayout);
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
-  }, [displayAgents.length]);
+  }, [grouped.openclaw.length, grouped.claude.slice(0, CLAUDE_SHOWN_LIMIT).length]);
+
+  // 展开时的布局策略：
+  // - 如果当前是两行，展开后高度不变，使用滚动模式
+  // - 如果当前是一行，展开后可能变两行，需要固定高度
+  const effectiveLayoutMode = showAllClaude && layoutMode === 'two-rows'
+    ? 'scroll'  // 两行展开 -> 保持高度，滚动展示
+    : showAllClaude
+      ? 'two-rows'  // 一行展开 -> 变成两行
+      : layoutMode;
+
+  // 是否需要固定高度（一行展开可能变两行的情况）
+  const needsFixedHeight = showAllClaude && layoutMode === 'one-row';
 
   return (
     <>
@@ -202,10 +223,11 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
         ref={containerRef}
         className={`
           flex items-stretch gap-2 px-6 py-2
-          ${layoutMode === 'one-row' ? 'flex-nowrap overflow-x-auto' : ''}
-          ${layoutMode === 'two-rows' ? 'flex-wrap' : ''}
-          ${layoutMode === 'scroll' ? 'flex-wrap max-h-[88px] overflow-x-auto overflow-y-hidden' : ''}
+          ${effectiveLayoutMode === 'one-row' ? 'flex-nowrap overflow-x-auto' : ''}
+          ${effectiveLayoutMode === 'two-rows' ? 'flex-wrap' : ''}
+          ${effectiveLayoutMode === 'scroll' ? 'flex-wrap max-h-[88px] overflow-x-auto overflow-y-hidden' : ''}
         `}
+        style={needsFixedHeight ? { minHeight: '88px' } : undefined}
       >
         {displayAgents.map(agent => (
           <AgentButton
@@ -224,6 +246,17 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
           >
             <ChevronDown className="w-3.5 h-3.5" />
             +{hiddenClaudeCount}
+          </button>
+        )}
+
+        {/* Collapse button when expanded */}
+        {showAllClaude && grouped.claude.length > CLAUDE_SHOWN_LIMIT && (
+          <button
+            onClick={() => setShowAllClaude(false)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+            收起
           </button>
         )}
       </div>

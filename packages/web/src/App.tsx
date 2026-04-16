@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { RefreshCw, Settings, LayoutDashboard, GitBranch, Bot } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Settings, LayoutDashboard, GitBranch, Bot } from 'lucide-react';
 import { TasksPage } from './pages/TasksPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { ComponentsPage } from './pages/ComponentsPage';
@@ -12,58 +12,28 @@ import type { PipelineTemplate } from '@pipeline/shared';
 type Page = 'tasks' | 'agents' | 'components' | 'pipelines';
 
 function App() {
-  const agents = useAgentStore(s => s.agents);
-  const selectedAgentId = useAgentStore(s => s.selectedAgentId);
-  const selectAgent = useAgentStore(s => s.selectAgent);
   const fetchAgents = useAgentStore(s => s.fetchAgents);
-  const tasks = useTaskStore(s => s.tasks);
-  const fetchTasks = useTaskStore(s => s.fetchTasks);
 
   const [currentPage, setCurrentPage] = useState<Page>('tasks');
   const [templates, setTemplates] = useState<PipelineTemplate[]>([]);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
 
-  // Silently update data without showing loading states
-  const refreshSilently = useCallback(async () => {
+  // Initial load only
+  const loadData = useCallback(async () => {
     try {
       await Promise.all([
-        (async () => {
-          const data = await api.agents.list();
-          useAgentStore.setState({ agents: data, lastSync: new Date() });
-        })(),
-        (async () => {
-          const data = await api.tasks.list();
-          useTaskStore.setState({ tasks: data, loading: false });
-        })(),
+        fetchAgents(),
+        useTaskStore.getState().fetchTasks(),
       ]);
       const tpl = await api.pipelines.listTemplates();
       setTemplates(tpl);
     } catch {
-      // Silently ignore background refresh errors
+      // Silently ignore errors
     }
-  }, []);
+  }, [fetchAgents]);
 
-  // Initial load
   useEffect(() => {
-    refreshSilently();
-  }, [refreshSilently]);
-
-  // Background refresh every 10s (silent, no loading state)
-  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    refreshTimer.current = setInterval(refreshSilently, 10000);
-    return () => { if (refreshTimer.current) clearInterval(refreshTimer.current); };
-  }, [refreshSilently]);
-
-  const handleManualRefresh = async () => {
-    setManualRefreshing(true);
-    await refreshSilently();
-    setManualRefreshing(false);
-  };
-
-  const runningCount = tasks.filter(t => t.status === 'running').length;
-  const pendingCount = tasks.filter(t => t.status === 'pending').length;
-  const completedCount = tasks.filter(t => t.status === 'completed').length;
+    loadData();
+  }, [loadData]);
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -74,17 +44,6 @@ function App() {
             <span className="text-base font-semibold text-gray-100">AI研发控制台</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span>运行: {runningCount}</span>
-            <span>队列: {pendingCount}</span>
-            <span>完成: {completedCount}</span>
-            <button
-              onClick={handleManualRefresh}
-              disabled={manualRefreshing}
-              className="p-1 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
-              title="刷新"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${manualRefreshing ? 'animate-spin' : ''}`} />
-            </button>
             <button className="p-1 hover:bg-gray-800 rounded transition-colors" title="设置">
               <Settings className="w-3.5 h-3.5" />
             </button>
@@ -142,10 +101,7 @@ function App() {
 
       {/* Page Content */}
       {currentPage === 'tasks' && (
-        <TasksPage
-          templates={templates}
-          onRefreshTasks={fetchTasks}
-        />
+        <TasksPage templates={templates} />
       )}
       {currentPage === 'agents' && <AgentsPage />}
       {currentPage === 'components' && <ComponentsPage />}

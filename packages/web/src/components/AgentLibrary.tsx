@@ -11,6 +11,7 @@ type AgentSource = 'all' | 'openclaw' | 'claude' | 'custom';
 
 interface GroupedAgents {
   openclaw: Agent[];
+  openclawCount: number;
   custom: Agent[];
   claude: Agent[];
   claudeCount: number;
@@ -104,9 +105,9 @@ export function AgentLibrary() {
       return 0;
     });
 
-  // Limit Claude agents display (show only 2 in "all" tab)
-  const OPENCLAW_PRIORITY_COUNT = 6; // Show all OpenClaw
-  const CLAUDE_DISPLAY_LIMIT = 2;    // Show only 2 Claude agents
+  // Limit agents display in "all" tab
+  const OPENCLAW_DISPLAY_LIMIT = 4;
+  const CLAUDE_DISPLAY_LIMIT = 4;
 
   const getDisplayAgents = (): Agent[] | GroupedAgents => {
     if (activeTab === 'openclaw') {
@@ -124,7 +125,8 @@ export function AgentLibrary() {
     const claude = filteredAgents.filter(a => a.source === 'claude');
 
     return {
-      openclaw,
+      openclaw: openclaw.slice(0, OPENCLAW_DISPLAY_LIMIT),
+      openclawCount: openclaw.length,
       custom,
       claude: claude.slice(0, CLAUDE_DISPLAY_LIMIT),
       claudeCount: claude.length,
@@ -170,34 +172,36 @@ export function AgentLibrary() {
         }
       />
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 mb-4 border-b border-gray-800">
-        {SOURCE_TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.key
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs + Search */}
+      <div className="flex items-center justify-between mb-4 border-b border-gray-800">
+        <div className="flex items-center gap-1">
+          {SOURCE_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.key
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Search */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-        <Input
-          type="text"
-          placeholder="搜索 Agent..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-        />
+        {/* Search */}
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input
+            type="text"
+            placeholder="搜索 Agent..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          />
+        </div>
       </div>
 
       {/* Tag Filter */}
@@ -245,7 +249,10 @@ export function AgentLibrary() {
             <div>
               <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
                 <span className="text-lg">🦀</span>
-                OpenClaw Agents ({displayData.openclaw.length})
+                OpenClaw Agents ({displayData.openclawCount})
+                {displayData.openclawCount > OPENCLAW_DISPLAY_LIMIT && (
+                  <span className="text-gray-600 text-xs">(显示 {OPENCLAW_DISPLAY_LIMIT} 个)</span>
+                )}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {displayData.openclaw.map((agent) => (
@@ -257,6 +264,14 @@ export function AgentLibrary() {
                   />
                 ))}
               </div>
+              {displayData.openclawCount > OPENCLAW_DISPLAY_LIMIT && (
+                <button
+                  onClick={() => setActiveTab('openclaw')}
+                  className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+                >
+                  查看更多 OpenClaw Agents (+{displayData.openclawCount - OPENCLAW_DISPLAY_LIMIT})
+                </button>
+              )}
             </div>
           )}
 
@@ -345,13 +360,13 @@ function AgentCard({ agent, onEdit, onDelete }: {
   const badge = getSourceBadge(agent.source || 'openclaw');
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors">
-      <div className="flex items-start justify-between mb-2">
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 hover:border-gray-700 transition-colors">
+      <div className="flex items-start justify-between mb-1.5">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-xl">{agent.emoji || '🤖'}</span>
+          <span className="text-lg">{agent.emoji || '🤖'}</span>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-gray-200">{agent.name}</div>
-            <div className="flex items-center gap-2 overflow-hidden">
+            <div className="text-sm font-medium text-gray-200 leading-tight">{agent.name}</div>
+            <div className="flex items-center gap-2 overflow-hidden mt-0.5">
               <span className="text-xs text-gray-500 shrink-0">{agent.role}</span>
               {agent.tags && agent.tags.length > 0 && (
                 <div className="flex items-center gap-1 overflow-hidden">
@@ -371,11 +386,11 @@ function AgentCard({ agent, onEdit, onDelete }: {
       </div>
 
       {agent.description && (
-        <p className="text-xs text-gray-500 mb-3 line-clamp-2">{agent.description}</p>
+        <p className="text-xs text-gray-500 mb-2 line-clamp-2 leading-relaxed">{agent.description}</p>
       )}
 
       {agent.source === 'custom' && agent.model && (
-        <div className="text-xs text-gray-600 mb-3">
+        <div className="text-xs text-gray-600 mb-2">
           模型: <span className="text-gray-400">{agent.model}</span>
         </div>
       )}

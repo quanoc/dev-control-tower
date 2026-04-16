@@ -212,11 +212,11 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="p-6">
+    <div>
       {onBack && (
         <button
           onClick={onBack}
-          className="flex items-center gap-1 px-3 py-1.5 mb-4 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 mb-4 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors ml-6 mt-6"
         >
           ← 模板
         </button>
