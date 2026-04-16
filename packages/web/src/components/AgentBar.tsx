@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Agent } from '@pipeline/shared';
 import { ChevronDown } from 'lucide-react';
 
@@ -52,14 +52,6 @@ const STATUS_COLORS: Record<string, string> = {
   offline: 'text-gray-600',
 };
 
-function sortByPipeline(agents: Agent[]): Agent[] {
-  return [...agents].sort((a, b) => {
-    const ai = PIPELINE_ORDER.indexOf(a.id);
-    const bi = PIPELINE_ORDER.indexOf(b.id);
-    return ai - bi;
-  });
-}
-
 interface GroupedAgents {
   openclaw: Agent[];
   claude: Agent[];
@@ -93,8 +85,63 @@ function groupAgents(agents: Agent[]): GroupedAgents {
   return result;
 }
 
+interface AgentButtonProps {
+  agent: Agent;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+}
+
+function AgentButton({ agent, selectedId, onSelect }: AgentButtonProps) {
+  const isSelected = selectedId === agent.id;
+  const roleLabel = ROLE_LABELS[agent.id] || agent.role;
+  const roleType = ROLE_TYPE[agent.id] || '';
+  const statusLabel = STATUS_LABELS[agent.status] || '待命';
+  const statusColor = STATUS_COLORS[agent.status] || 'text-gray-600';
+
+  return (
+    <button
+      onClick={() => onSelect(isSelected ? null : agent.id)}
+      className={`
+        flex items-center gap-3 px-4 py-1.5 rounded-lg
+        border transition-all duration-150 cursor-pointer flex-shrink-0
+        ${isSelected
+          ? 'border-blue-500/50 bg-blue-500/10'
+          : 'border-gray-800 hover:border-gray-700 hover:bg-gray-900/50'
+        }
+      `}
+    >
+      {/* Left: emoji */}
+      <span className="text-lg flex-shrink-0">{agent.emoji || '🤖'}</span>
+
+      {/* Right: two rows */}
+      <div className="flex flex-col items-start">
+        {/* Row 1: name + role type */}
+        <div className="flex items-baseline gap-1">
+          <span className={`text-sm font-medium leading-none ${isSelected ? 'text-blue-300' : 'text-gray-200'}`}>
+            {agent.name}
+          </span>
+          {roleType && (
+            <span className={`text-[10px] font-mono leading-none ${isSelected ? 'text-blue-400' : 'text-gray-500'}`}>
+              {roleType}
+            </span>
+          )}
+        </div>
+        {/* Row 2: role label + status */}
+        <span className="text-[11px] text-gray-500 leading-none flex items-center gap-1.5 mt-1">
+          <span>{roleLabel}</span>
+          <span className="text-gray-700">·</span>
+          <span className={statusColor}>{statusLabel}</span>
+        </span>
+      </div>
+    </button>
+  );
+}
+
 export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
   const [showAllClaude, setShowAllClaude] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [layoutMode, setLayoutMode] = useState<'one-row' | 'two-rows' | 'scroll'>('one-row');
 
   const grouped = useMemo(() => groupAgents(agents), [agents]);
 
@@ -106,65 +153,80 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
   // Combine: OpenClaw + visible Claude + others
   const displayAgents = [...grouped.openclaw, ...visibleClaude, ...grouped.others];
 
+  // 计算布局模式
+  useEffect(() => {
+    const container = containerRef.current;
+    const measureEl = measureRef.current;
+    if (!container || !measureEl) return;
+
+    const checkLayout = () => {
+      const containerWidth = container.clientWidth;
+      const oneRowWidth = measureEl.scrollWidth;
+
+      if (oneRowWidth <= containerWidth) {
+        setLayoutMode('one-row');
+      } else if (oneRowWidth <= containerWidth * 2) {
+        setLayoutMode('two-rows');
+      } else {
+        setLayoutMode('scroll');
+      }
+    };
+
+    checkLayout();
+
+    const resizeObserver = new ResizeObserver(checkLayout);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [displayAgents.length]);
+
   return (
-    <div className="flex items-stretch gap-2 px-6 py-2 overflow-x-auto">
-      {displayAgents.map(agent => {
-        const isSelected = selectedId === agent.id;
-        const roleLabel = ROLE_LABELS[agent.id] || agent.role;
-        const roleType = ROLE_TYPE[agent.id] || '';
-        const statusLabel = STATUS_LABELS[agent.status] || '待命';
-        const statusColor = STATUS_COLORS[agent.status] || 'text-gray-600';
-
-        return (
-          <button
+    <>
+      {/* 隐藏的测量层 */}
+      <div
+        ref={measureRef}
+        className="fixed -left-[9999px] flex gap-2 px-6"
+        aria-hidden="true"
+      >
+        {displayAgents.map(agent => (
+          <AgentButton
             key={agent.id}
-            onClick={() => onSelect(isSelected ? null : agent.id)}
-            className={`
-              flex items-center gap-3 px-4 py-1.5 rounded-lg
-              border transition-all duration-150 cursor-pointer flex-shrink-0
-              ${isSelected
-                ? 'border-blue-500/50 bg-blue-500/10'
-                : 'border-gray-800 hover:border-gray-700 hover:bg-gray-900/50'
-              }
-            `}
+            agent={agent}
+            selectedId={selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+
+      {/* 实际显示层 */}
+      <div
+        ref={containerRef}
+        className={`
+          flex items-stretch gap-2 px-6 py-2
+          ${layoutMode === 'one-row' ? 'flex-nowrap overflow-x-auto' : ''}
+          ${layoutMode === 'two-rows' ? 'flex-wrap' : ''}
+          ${layoutMode === 'scroll' ? 'flex-wrap max-h-[88px] overflow-x-auto overflow-y-hidden' : ''}
+        `}
+      >
+        {displayAgents.map(agent => (
+          <AgentButton
+            key={agent.id}
+            agent={agent}
+            selectedId={selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+
+        {/* Claude agents overflow indicator */}
+        {hiddenClaudeCount > 0 && !showAllClaude && (
+          <button
+            onClick={() => setShowAllClaude(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
           >
-            {/* Left: emoji */}
-            <span className="text-lg flex-shrink-0">{agent.emoji || '🤖'}</span>
-
-            {/* Right: two rows */}
-            <div className="flex flex-col items-start">
-              {/* Row 1: name + role type */}
-              <div className="flex items-baseline gap-1">
-                <span className={`text-sm font-medium leading-none ${isSelected ? 'text-blue-300' : 'text-gray-200'}`}>
-                  {agent.name}
-                </span>
-                {roleType && (
-                  <span className={`text-[10px] font-mono leading-none ${isSelected ? 'text-blue-400' : 'text-gray-500'}`}>
-                    {roleType}
-                  </span>
-                )}
-              </div>
-              {/* Row 2: role label + status */}
-              <span className="text-[11px] text-gray-500 leading-none flex items-center gap-1.5 mt-1">
-                <span>{roleLabel}</span>
-                <span className="text-gray-700">·</span>
-                <span className={statusColor}>{statusLabel}</span>
-              </span>
-            </div>
+            <ChevronDown className="w-3.5 h-3.5" />
+            +{hiddenClaudeCount}
           </button>
-        );
-      })}
-
-      {/* Claude agents overflow indicator */}
-      {hiddenClaudeCount > 0 && !showAllClaude && (
-        <button
-          onClick={() => setShowAllClaude(true)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
-        >
-          <ChevronDown className="w-3.5 h-3.5" />
-          +{hiddenClaudeCount}
-        </button>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Trash2, Edit2, X, Grid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Grid, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { api } from '../api/client';
 import { useAgentStore } from '../store/agents';
+import { Button } from './ui/Button';
+import { SectionHeader } from './ui/SectionHeader';
 
 interface Component {
   id: number;
@@ -211,27 +213,25 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              ← 模板
-            </button>
-          )}
-          <h2 className="text-lg font-semibold text-gray-200">流水线组件</h2>
-        </div>
+      {onBack && (
         <button
-          onClick={openNewForm}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          onClick={onBack}
+          className="flex items-center gap-1 px-3 py-1.5 mb-4 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          <span>新建组件</span>
+          ← 模板
         </button>
-      </div>
+      )}
+      <SectionHeader
+        icon={<Layers className="w-4 h-4 text-cyan-400" />}
+        title="流水线组件"
+        badge="COMPONENTS"
+        actions={
+          <Button onClick={openNewForm}>
+            <Plus className="w-4 h-4" />
+            新建组件
+          </Button>
+        }
+      />
 
       {/* Tabs + Search */}
       <div className="flex items-center justify-between mb-4">

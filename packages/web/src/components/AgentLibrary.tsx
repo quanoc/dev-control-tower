@@ -3,6 +3,7 @@ import { Plus, Search, Trash2, Edit2, X, Bot, RefreshCw, User, Sparkles, Tag } f
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { Input, TextArea, Select, FormField } from './ui/Input';
+import { SectionHeader } from './ui/SectionHeader';
 import { api } from '../api/client';
 import type { Agent } from '@pipeline/shared';
 
@@ -145,31 +146,29 @@ export function AgentLibrary() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-100">Agent 管理</h2>
-          <p className="text-sm text-gray-500 mt-1">管理 OpenClaw、Claude 和自定义 Agents</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleSync}
-            disabled={syncing}
-            aria-label="同步 Agents"
-            title="同步 Agents"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            onClick={() => { setEditingId(null); setShowForm(true); }}
-          >
-            <Plus className="w-4 h-4" />
-            新建 Agent
-          </Button>
-        </div>
-      </div>
+      <SectionHeader
+        icon={<Bot className="w-4 h-4 text-cyan-400" />}
+        title="Agent 管理"
+        badge="AGENTS"
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSync}
+              disabled={syncing}
+              aria-label="同步 Agents"
+              title="同步 Agents"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button onClick={() => { setEditingId(null); setShowForm(true); }}>
+              <Plus className="w-4 h-4" />
+              新建 Agent
+            </Button>
+          </>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-4 border-b border-gray-800">

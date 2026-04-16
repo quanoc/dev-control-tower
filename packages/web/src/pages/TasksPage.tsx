@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { GitBranch, Plus, Users } from 'lucide-react';
 import { AgentBar } from '../components/AgentBar';
 import { AgentDrawer } from '../components/AgentDrawer';
 import { TaskList } from '../components/TaskList';
 import { NewTaskDialog } from '../components/NewTaskDialog';
 import { Button } from '../components/ui/Button';
+import { SectionHeader } from '../components/ui/SectionHeader';
 import { useAgentStore } from '../store/agents';
 import { useTaskStore } from '../store/tasks';
 import type { PipelineTemplate } from '@pipeline/shared';
@@ -28,16 +29,17 @@ export function TasksPage({ templates, onRefreshTasks }: TasksPageProps) {
     <main className="flex-1 flex flex-col">
       {/* Agent Role Bar */}
       <section className="border-b border-gray-800/50">
-        <div className="flex items-center justify-between px-6 pt-4 pb-3">
-          <div className="flex items-center gap-3">
-            <Users className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-lg font-semibold text-gray-100">数字团队</h2>
-            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">DIGITAL TEAMS</span>
+        <SectionHeader
+          icon={<Users className="w-4 h-4 text-cyan-400" />}
+          title="数字团队"
+          badge="DIGITAL TEAMS"
+          info={
             <span className="text-sm text-gray-500">
               已发现 <span className="text-cyan-400 font-mono font-semibold">{agents.length}</span> 个 Agent
             </span>
-          </div>
-        </div>
+          }
+          className="px-6 pt-6 pb-3"
+        />
         <AgentBar
           agents={agents}
           selectedId={selectedAgentId}
@@ -52,17 +54,18 @@ export function TasksPage({ templates, onRefreshTasks }: TasksPageProps) {
 
       {/* Main Content */}
       <section className="flex-1 px-6 py-6">
-        {/* Task toolbar */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-gray-100">需求任务流水线</h2>
-            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">TASK PIPELINE</span>
-          </div>
-          <Button onClick={() => setShowNewTask(true)}>
-            <Plus className="w-4 h-4" />
-            新建需求
-          </Button>
-        </div>
+        <SectionHeader
+          icon={<GitBranch className="w-4 h-4 text-cyan-400" />}
+          title="需求任务流水线"
+          badge="TASK PIPELINE"
+          actions={
+            <Button onClick={() => setShowNewTask(true)}>
+              <Plus className="w-4 h-4" />
+              新建需求
+            </Button>
+          }
+          className="mb-5"
+        />
 
         {/* Task List */}
         <TaskList />

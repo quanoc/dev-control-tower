@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Modal } from './ui/Modal';
 import { Input, TextArea, Select, FormField } from './ui/Input';
 import { Badge } from './ui/Badge';
+import { SectionHeader } from './ui/SectionHeader';
 import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
 import { PipelinePreview } from './PipelinePreview';
 import { StepDrawer } from './StepDrawer';
@@ -364,19 +365,17 @@ export function PipelineManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-100">流水线模板</h2>
-          <p className="text-sm text-gray-500 mt-1">管理研发流程的流水线模板</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SectionHeader
+        icon={<GitBranch className="w-4 h-4 text-cyan-400" />}
+        title="流水线模板"
+        badge="TEMPLATES"
+        actions={
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4" />
             新建模板
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Template List */}
       {templates.length === 0 ? (
