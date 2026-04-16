@@ -364,8 +364,8 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
       {/* Form Modal */}
       {showForm && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowForm(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-xl p-5 z-[60] w-[480px] shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 z-modal" onClick={() => setShowForm(false)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-xl p-5 z-popover w-[480px] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-medium text-gray-200">
                 {editingId ? '编辑组件' : '新建组件'}

@@ -68,7 +68,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-40">
+      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-sticky">
         <div className="flex items-center justify-between px-6 py-2.5">
           <div className="flex items-center gap-3">
             <span className="text-base font-semibold text-gray-100">AI研发控制台</span>

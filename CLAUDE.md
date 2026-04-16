@@ -35,6 +35,22 @@ dev-control-tower/
 - 使用 immutable 数据模式
 - 80%+ 测试覆盖率
 
+### 前端规范
+
+**基础组件**（`packages/web/src/components/ui/`）：
+- `Button`、`Modal`、`Input`、`Card`、`Badge` - 新功能优先使用
+- 禁止重复造轮子，复用已有组件
+
+**z-index 层级**：
+```
+drawer(50) < modal(60) < popover(70) < toast(80)
+```
+禁止使用 `z-[N]` 任意值。
+
+**图标**：统一使用 `lucide-react`，禁止在 UI 组件中使用 Emoji。
+
+**可访问性**：图标按钮必须有 `aria-label`。
+
 ## 常用命令
 
 ```bash

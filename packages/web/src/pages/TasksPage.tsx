@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { AgentBar } from '../components/AgentBar';
 import { AgentDrawer } from '../components/AgentDrawer';
 import { TaskList } from '../components/TaskList';
 import { NewTaskDialog } from '../components/NewTaskDialog';
+import { Button } from '../components/ui/Button';
 import { useAgentStore } from '../store/agents';
 import { useTaskStore } from '../store/tasks';
 import type { PipelineTemplate } from '@pipeline/shared';
@@ -24,18 +25,18 @@ export function TasksPage({ templates, onRefreshTasks }: TasksPageProps) {
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
   return (
-    <>
+    <main className="flex-1 flex flex-col">
       {/* Agent Role Bar */}
       <section className="border-b border-gray-800/50">
-        <div className="flex items-center justify-between px-6 pt-3 pb-2">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <span>👥</span>
-            <span>数字团队</span>
+        <div className="flex items-center justify-between px-6 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <Users className="w-4 h-4 text-cyan-400" />
+            <h2 className="text-lg font-semibold text-gray-100">数字团队</h2>
             <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">DIGITAL TEAMS</span>
-            <span className="text-xs text-gray-500 ml-2">
+            <span className="text-sm text-gray-500">
               已发现 <span className="text-cyan-400 font-mono font-semibold">{agents.length}</span> 个 Agent
             </span>
-          </h2>
+          </div>
         </div>
         <AgentBar
           agents={agents}
@@ -50,26 +51,22 @@ export function TasksPage({ templates, onRefreshTasks }: TasksPageProps) {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 px-6 py-4">
+      <section className="flex-1 px-6 py-6">
         {/* Task toolbar */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <span>📋</span>
-            <span>需求任务流水线</span>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-100">需求任务流水线</h2>
             <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">TASK PIPELINE</span>
-          </h2>
-          <button
-            onClick={() => setShowNewTask(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-          >
+          </div>
+          <Button onClick={() => setShowNewTask(true)}>
             <Plus className="w-4 h-4" />
             新建需求
-          </button>
+          </Button>
         </div>
 
         {/* Task List */}
         <TaskList />
-      </main>
+      </section>
 
       {/* New Task Dialog */}
       {showNewTask && (
@@ -82,6 +79,6 @@ export function TasksPage({ templates, onRefreshTasks }: TasksPageProps) {
           }}
         />
       )}
-    </>
+    </main>
   );
 }

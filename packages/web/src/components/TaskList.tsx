@@ -2,15 +2,20 @@ import type { Task, StageRun, PipelineInstance } from '@pipeline/shared';
 import { Play, Loader2, Eye, GitBranch } from 'lucide-react';
 import { useState } from 'react';
 import { PipelineFlow } from './PipelineFlow';
+import { Button } from './ui/Button';
+import { Modal } from './ui/Modal';
+import { Badge } from './ui/Badge';
 import { useTaskStore } from '../store/tasks';
 
-const TASK_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor?: string }> = {
-  pending:    { label: '待启动', color: 'text-gray-400' },
-  running:    { label: '进行中', color: 'text-blue-400' },
-  completed:  { label: '已完成', color: 'text-emerald-400' },
-  failed:     { label: '失败',   color: 'text-red-400' },
-  cancelled:  { label: '已取消', color: 'text-gray-600' },
-  paused:     { label: '已暂停', color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
+type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'cyan' | 'purple' | 'orange' | 'amber';
+
+const TASK_STATUS_CONFIG: Record<string, { label: string; variant: BadgeVariant; color: string }> = {
+  pending:    { label: '待启动', variant: 'default', color: 'text-gray-400' },
+  running:    { label: '进行中', variant: 'primary', color: 'text-blue-400' },
+  completed:  { label: '已完成', variant: 'success', color: 'text-emerald-400' },
+  failed:     { label: '失败',   variant: 'danger',  color: 'text-red-400' },
+  cancelled:  { label: '已取消', variant: 'default', color: 'text-gray-600' },
+  paused:     { label: '已暂停', variant: 'warning', color: 'text-amber-400' },
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -58,6 +63,15 @@ function getCurrentStage(pipeline: PipelineInstance | null): { label: string; pr
   return { label, progress };
 }
 
+const STAGE_STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
+  completed:        { label: '已完成', variant: 'success' },
+  running:          { label: '执行中', variant: 'primary' },
+  failed:           { label: '失败',   variant: 'danger' },
+  skipped:          { label: '跳过',   variant: 'default' },
+  pending:          { label: '待执行', variant: 'default' },
+  waiting_approval: { label: '待审批', variant: 'warning' },
+};
+
 interface PipelineModalProps {
   pipeline: PipelineInstance;
   onClose: () => void;
@@ -68,72 +82,56 @@ interface PipelineModalProps {
 
 function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: PipelineModalProps) {
   return (
-    <>
-      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onClose} />
-      <div className="fixed inset-8 bg-gray-900 border border-gray-800 rounded-2xl z-[70] flex flex-col overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <GitBranch className="w-5 h-5 text-blue-400" />
-            <h3 className="text-base font-semibold text-gray-100">流水线进度</h3>
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      title="流水线进度"
+      footer={
+        <Button variant="ghost" onClick={onClose}>关闭</Button>
+      }
+    >
+      <div className="p-6 space-y-6">
+        {/* Pipeline flow visual */}
+        <div>
+          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">流程总览</h4>
+          <div className="flex items-center gap-2">
+            <PipelineFlow
+              stageRuns={pipeline.stageRuns}
+              currentStageIndex={pipeline.currentStageIndex}
+              templatePhases={pipeline.templatePhases}
+            />
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-            <span className="text-gray-400 text-lg">&times;</span>
-          </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Pipeline flow visual */}
-          <div className="mb-6">
-            <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">流程总览</h4>
-            <div className="flex items-center gap-2">
-              <PipelineFlow
-                stageRuns={pipeline.stageRuns}
-                currentStageIndex={pipeline.currentStageIndex}
-                templatePhases={pipeline.templatePhases}
-              />
-            </div>
-          </div>
-
-          {/* Stage detail table */}
-          <div>
-            <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
-            <div className="overflow-x-auto rounded-lg border border-gray-800">
-              <table className="w-full text-xs whitespace-nowrap">
-                <thead>
-                  <tr className="bg-gray-900 border-b border-gray-800">
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-8">#</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-16">阶段</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium">步骤</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">执行者</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">状态</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">耗时</th>
-                    <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-48">输出</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pipeline.stageRuns.map((stage, i) => (
-                    <StageRow key={stage.id} stage={stage} index={i} onRetry={onRetry} onSkip={onSkip} onApprove={onApprove} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* Stage detail table */}
+        <div>
+          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
+          <div className="overflow-x-auto rounded-lg border border-gray-800">
+            <table className="w-full text-xs whitespace-nowrap">
+              <thead>
+                <tr className="bg-gray-900 border-b border-gray-800">
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-8">#</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-16">阶段</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium">步骤</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">执行者</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">状态</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">耗时</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-48">输出</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipeline.stageRuns.map((stage, i) => (
+                  <StageRow key={stage.id} stage={stage} index={i} onRetry={onRetry} onSkip={onSkip} onApprove={onApprove} />
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-    </>
+    </Modal>
   );
 }
-
-const STAGE_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
-  completed:        { label: '已完成', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
-  running:          { label: '执行中', bg: 'bg-blue-500/15',   text: 'text-blue-400' },
-  failed:           { label: '失败',   bg: 'bg-red-500/15',    text: 'text-red-400' },
-  skipped:          { label: '跳过',   bg: 'bg-gray-800',      text: 'text-gray-500' },
-  pending:          { label: '待执行', bg: 'bg-gray-800',      text: 'text-gray-500' },
-  waiting_approval: { label: '待审批', bg: 'bg-amber-500/15',  text: 'text-amber-400' },
-};
 
 function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRun; index: number; onRetry?: (id: number) => void; onSkip?: (id: number) => void; onApprove?: (id: number) => void }) {
   const status = STAGE_STATUS_MAP[stage.status] || STAGE_STATUS_MAP.pending;
@@ -155,9 +153,7 @@ function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRu
       <td className="px-3 py-2.5 text-gray-300">{stepLabel}</td>
       <td className="px-3 py-2.5 text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
       <td className="px-3 py-2.5">
-        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] ${status.bg} ${status.text}`}>
-          {status.label}
-        </span>
+        <Badge variant={status.variant}>{status.label}</Badge>
       </td>
       <td className="px-3 py-2.5 text-gray-500 font-mono">{duration}</td>
       <td className="px-3 py-2.5">
@@ -312,49 +308,53 @@ function TaskRow({ task }: TaskRowProps) {
         <td className="px-4 py-3">
           <div className="flex items-center gap-1.5">
             {task.status === 'pending' && (
-              <button
+              <Button
+                variant="success"
+                size="sm"
                 onClick={handleStart}
                 disabled={starting || !pipeline}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-800 disabled:text-gray-600 rounded text-xs font-medium transition-colors text-gray-200"
               >
                 {starting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 启动
-              </button>
+              </Button>
             )}
             {waitingStage && (
-              <button
+              <Button
+                variant="warning"
+                size="sm"
                 onClick={handleApprove}
                 disabled={approving}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-800 disabled:text-gray-600 rounded text-xs font-medium transition-colors text-gray-200"
               >
                 {approving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                 审批
-              </button>
+              </Button>
             )}
-            <button
-              className="flex items-center gap-1 px-2 py-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded text-xs transition-colors"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="查看详情"
               title="查看详情"
             >
               <Eye className="w-3.5 h-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowPipeline(true)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs transition-colors ${
-                pipeline
-                  ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800'
-                  : 'text-gray-600 hover:text-gray-500 cursor-not-allowed'
-              }`}
-              title={pipeline ? "查看流水线" : "需要先启动流水线"}
               disabled={!pipeline}
+              className={!pipeline ? 'text-gray-600 cursor-not-allowed' : ''}
+              aria-label={pipeline ? "查看流水线" : "需要先启动流水线"}
+              title={pipeline ? "查看流水线" : "需要先启动流水线"}
             >
               <GitBranch className="w-3.5 h-3.5" />
               流水线
-            </button>
+            </Button>
           </div>
         </td>
       </tr>
 
-      {/* Pipeline Modal */}
+      {/* Pipeline Modal - rendered outside of tr to fix invalid HTML */}
       {showPipeline && pipeline && (
         <PipelineModal
           pipeline={pipeline}

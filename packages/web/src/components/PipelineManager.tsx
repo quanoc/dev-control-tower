@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, X, GitBranch, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, GitBranch, Check } from 'lucide-react';
+import { Button } from './ui/Button';
 import { api } from '../api/client';
+import { Modal } from './ui/Modal';
+import { Input, TextArea, Select, FormField } from './ui/Input';
+import { Badge } from './ui/Badge';
 import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
 import { PipelinePreview } from './PipelinePreview';
 import { StepDrawer } from './StepDrawer';
@@ -300,7 +304,7 @@ export function PipelineManager() {
 
   const confirmAddPhase = () => {
     if (!newPhaseName.trim() || !addPhaseAfterKey) return;
-    const key = newPhaseName.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `phase_${Date.now()}`;
+    const key = newPhaseName.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || `phase_${Date.now()}`;
 
     const newPhase: PipelinePhase = {
       phaseKey: key,
@@ -367,13 +371,10 @@ export function PipelineManager() {
           <p className="text-sm text-gray-500 mt-1">管理研发流程的流水线模板</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-          >
+          <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4" />
             新建模板
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -414,13 +415,13 @@ export function PipelineManager() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        template.complexity === 'small' ? 'bg-cyan-500/20 text-cyan-400' :
-                        template.complexity === 'large' ? 'bg-purple-500/20 text-purple-400' :
-                        'bg-blue-500/20 text-blue-400'
-                      }`}>
-                        {template.complexity === 'small' ? '小需求' : template.complexity === 'large' ? '完整' : '标准'}
-                      </span>
+                      {template.complexity === 'small' ? (
+                        <Badge variant="cyan">小需求</Badge>
+                      ) : template.complexity === 'large' ? (
+                        <Badge variant="purple">完整</Badge>
+                      ) : (
+                        <Badge variant="primary">标准</Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 flex-wrap">
@@ -439,17 +440,21 @@ export function PipelineManager() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleEdit(template)}
-                          className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-gray-800 rounded-lg transition-colors"
+                          aria-label="编辑"
                           title="编辑"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDelete(template.id)}
                           disabled={deletingId === template.id}
-                          className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+                          aria-label="删除"
                           title="删除"
                         >
                           {deletingId === template.id ? (
@@ -457,7 +462,7 @@ export function PipelineManager() {
                           ) : (
                             <Trash2 className="w-3.5 h-3.5" />
                           )}
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -469,254 +474,215 @@ export function PipelineManager() {
       )}
 
       {/* Form Modal */}
-      {showForm && (
-        <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={handleCloseForm} />
-          <div className="fixed inset-4 bg-gray-900 border border-gray-800 rounded-2xl z-50 flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-              <h3 className="text-lg font-semibold text-gray-100">
-                {editingId ? '编辑流水线模板' : '新建流水线模板'}
-              </h3>
-              <button onClick={handleCloseForm} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Basic Info */}
-              <div className="space-y-3">
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">
-                      模板名称 <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                      placeholder="例如：AI主导研发流程"
-                    />
-                  </div>
-                  <div className="w-32">
-                    <label className="block text-xs text-gray-500 mb-1">复杂度</label>
-                    <select
-                      value={formData.complexity}
-                      onChange={e => setFormData(prev => ({ ...prev, complexity: e.target.value as any }))}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                    >
-                      {COMPLEXITY_OPTIONS.map(opt => (
-                        <option key={opt.key} value={opt.key}>{opt.icon} {opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">描述</label>
-                  <input
-                    type="text"
-                    value={formData.description}
-                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                    placeholder="描述这个流水线的用途..."
-                  />
-                </div>
-              </div>
-
-              {/* Quick Presets */}
-              <div className="flex gap-3">
-                {COMPLEXITY_OPTIONS.map(opt => (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => handleCreatePreset(opt.key)}
-                    className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors text-left"
-                  >
-                    <span className="text-lg">{opt.icon}</span>
-                    <div>
-                      <div className="text-sm font-medium text-gray-200">{opt.label}</div>
-                      <div className="text-xs text-gray-500">{opt.desc}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Pipeline Preview */}
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">流水线预览 · 点击阶段修改名称，点击步骤编辑</label>
-                <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                  <PipelinePreview
-                    phases={formData.phases}
-                    selectedPhase={null}
-                    selectedStep={selectedStep}
-                    onSelectStep={(pk, si) => { setSelectedStep({ phaseKey: pk, stepIndex: si }); setShowPicker(false); }}
-                    onRemoveStep={removeStep}
-                    onAddStepToPhase={(pk) => { setShowPicker(true); setPickerPhase(pk as PhaseKey); setSelectedStep(null); }}
-                    onEditPhase={handleEditPhase}
-                    onRemoveCustomPhase={(pk) => setFormData(prev => ({ ...prev, phases: prev.phases.filter(p => p.phaseKey !== pk) }))}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDragEnd={handleDragEnd}
-                    onAddPhaseAfter={addPhaseAfter}
-                    onToggleBatchBoundary={toggleBatchBoundary}
-                  />
-                </div>
-              </div>
-
-              {/* Step Drawer */}
-              {selectedStep && !showPicker && (() => {
-                const phase = formData.phases.find(p => p.phaseKey === selectedStep.phaseKey);
-                const step = phase?.steps[selectedStep.stepIndex];
-                if (!step) return null;
-                return (
-                  <StepDrawer
-                    step={step}
-                    phaseKey={selectedStep.phaseKey as PhaseKey}
-                    onChange={(field, value) => updateStep(selectedStep.phaseKey, selectedStep.stepIndex, field, value)}
-                    onClose={() => setSelectedStep(null)}
-                  />
-                );
-              })()}
-
-              {showPicker && pickerPhase && (
-                <ComponentPickerDrawer
-                  phaseKey={pickerPhase}
-                  onSelect={(step) => {
-                    setFormData(prev => {
-                      const existing = prev.phases.find(p => p.phaseKey === pickerPhase);
-                      if (existing) {
-                        // Add step to end with serial batch
-                        const newBatches = [...(existing.batches || existing.steps.map(() => 1)), 1];
-                        return {
-                          ...prev,
-                          phases: prev.phases.map(p =>
-                            p.phaseKey === pickerPhase
-                              ? { ...p, steps: [...p.steps, step], batches: newBatches }
-                              : p
-                          ),
-                        };
-                      }
-                      const def = getPhaseDef(pickerPhase as string);
-                      return {
-                        ...prev,
-                        phases: [
-                          ...prev.phases,
-                          {
-                            phaseKey: pickerPhase,
-                            label: def?.label || pickerPhase,
-                            icon: def?.icon || '📌',
-                            steps: [step],
-                            batches: [1],
-                          },
-                        ],
-                      };
-                    });
-                    setShowPicker(false);
-                    setPickerPhase(null);
-                  }}
-                  onClose={() => { setShowPicker(false); setPickerPhase(null); }}
+      <Modal
+        open={showForm}
+        onClose={handleCloseForm}
+        size="full"
+        title={editingId ? '编辑流水线模板' : '新建流水线模板'}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={handleCloseForm}>
+              取消
+            </Button>
+            <Button
+              type="submit"
+              form="pipeline-form"
+              disabled={!formData.name.trim() || formData.phases.every(p => p.steps.length === 0) || saving}
+            >
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  {editingId ? '保存修改' : '创建模板'}
+                </>
+              )}
+            </Button>
+          </>
+        }
+      >
+        <form id="pipeline-form" onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Basic Info */}
+          <div className="space-y-3">
+            <div className="flex gap-4">
+              <FormField label="模板名称" required className="flex-1">
+                <Input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="例如：AI主导研发流程"
                 />
-              )}
-
-              {/* Add Phase Dialog */}
-              {showAddPhaseDialog && (
-                <>
-                  <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowAddPhaseDialog(false)} />
-                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-xl p-5 z-[60] w-80 shadow-2xl">
-                    <h4 className="text-sm font-medium text-gray-200 mb-3">添加阶段</h4>
-                    <input
-                      type="text"
-                      value={newPhaseName}
-                      onChange={e => setNewPhaseName(e.target.value)}
-                      placeholder="输入阶段名称"
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 mb-3"
-                      autoFocus
-                      onKeyDown={e => e.key === 'Enter' && confirmAddPhase()}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => setShowAddPhaseDialog(false)}
-                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white"
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={confirmAddPhase}
-                        disabled={!newPhaseName.trim()}
-                        className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
-                      >
-                        添加
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Edit Phase Dialog */}
-              {editingPhaseKey && (
-                <>
-                  <div className="fixed inset-0 bg-black/40 z-50" onClick={cancelEditPhase} />
-                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-xl p-5 z-[60] w-80 shadow-2xl">
-                    <h4 className="text-sm font-medium text-gray-200 mb-3">编辑阶段名称</h4>
-                    <input
-                      type="text"
-                      value={editingPhaseName}
-                      onChange={e => setEditingPhaseName(e.target.value)}
-                      placeholder="输入阶段名称"
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 mb-3"
-                      autoFocus
-                      onKeyDown={e => e.key === 'Enter' && confirmEditPhase()}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={cancelEditPhase}
-                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white"
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={confirmEditPhase}
-                        disabled={!editingPhaseName.trim()}
-                        className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
-                      >
-                        保存
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
-                <button
-                  type="button"
-                  onClick={handleCloseForm}
-                  className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+              </FormField>
+              <FormField label="复杂度" className="w-32">
+                <Select
+                  value={formData.complexity}
+                  onChange={e => setFormData(prev => ({ ...prev, complexity: e.target.value as any }))}
                 >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  disabled={!formData.name.trim() || formData.phases.every(p => p.steps.length === 0) || saving}
-                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors"
-                >
-                  {saving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      保存中...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      {editingId ? '保存修改' : '创建模板'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+                  {COMPLEXITY_OPTIONS.map(opt => (
+                    <option key={opt.key} value={opt.key}>{opt.icon} {opt.label}</option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+            <FormField label="描述">
+              <Input
+                type="text"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="描述这个流水线的用途..."
+              />
+            </FormField>
           </div>
-        </>
-      )}
+
+          {/* Quick Presets */}
+          <div className="flex gap-3">
+            {COMPLEXITY_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => handleCreatePreset(opt.key)}
+                className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors text-left"
+              >
+                <span className="text-lg">{opt.icon}</span>
+                <div>
+                  <div className="text-sm font-medium text-gray-200">{opt.label}</div>
+                  <div className="text-xs text-gray-500">{opt.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Pipeline Preview */}
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">流水线预览 · 点击阶段修改名称，点击步骤编辑</label>
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+              <PipelinePreview
+                phases={formData.phases}
+                selectedPhase={null}
+                selectedStep={selectedStep}
+                onSelectStep={(pk, si) => { setSelectedStep({ phaseKey: pk, stepIndex: si }); setShowPicker(false); }}
+                onRemoveStep={removeStep}
+                onAddStepToPhase={(pk) => { setShowPicker(true); setPickerPhase(pk as PhaseKey); setSelectedStep(null); }}
+                onEditPhase={handleEditPhase}
+                onRemoveCustomPhase={(pk) => setFormData(prev => ({ ...prev, phases: prev.phases.filter(p => p.phaseKey !== pk) }))}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onAddPhaseAfter={addPhaseAfter}
+                onToggleBatchBoundary={toggleBatchBoundary}
+              />
+            </div>
+          </div>
+
+          {/* Step Drawer */}
+          {selectedStep && !showPicker && (() => {
+            const phase = formData.phases.find(p => p.phaseKey === selectedStep.phaseKey);
+            const step = phase?.steps[selectedStep.stepIndex];
+            if (!step) return null;
+            return (
+              <StepDrawer
+                step={step}
+                phaseKey={selectedStep.phaseKey as PhaseKey}
+                onChange={(field, value) => updateStep(selectedStep.phaseKey, selectedStep.stepIndex, field, value)}
+                onClose={() => setSelectedStep(null)}
+              />
+            );
+          })()}
+
+          {showPicker && pickerPhase && (
+            <ComponentPickerDrawer
+              phaseKey={pickerPhase}
+              onSelect={(step) => {
+                setFormData(prev => {
+                  const existing = prev.phases.find(p => p.phaseKey === pickerPhase);
+                  if (existing) {
+                    // Add step to end with serial batch
+                    const newBatches = [...(existing.batches || existing.steps.map(() => 1)), 1];
+                    return {
+                      ...prev,
+                      phases: prev.phases.map(p =>
+                        p.phaseKey === pickerPhase
+                          ? { ...p, steps: [...p.steps, step], batches: newBatches }
+                          : p
+                      ),
+                    };
+                  }
+                  const def = getPhaseDef(pickerPhase as string);
+                  return {
+                    ...prev,
+                    phases: [
+                      ...prev.phases,
+                      {
+                        phaseKey: pickerPhase,
+                        label: def?.label || pickerPhase,
+                        icon: def?.icon || '📌',
+                        steps: [step],
+                        batches: [1],
+                      },
+                    ],
+                  };
+                });
+                setShowPicker(false);
+                setPickerPhase(null);
+              }}
+              onClose={() => { setShowPicker(false); setPickerPhase(null); }}
+            />
+          )}
+        </form>
+      </Modal>
+
+      {/* Add Phase Dialog */}
+      <Modal
+        open={showAddPhaseDialog}
+        onClose={() => setShowAddPhaseDialog(false)}
+        size="sm"
+        title="添加阶段"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowAddPhaseDialog(false)}>取消</Button>
+            <Button onClick={confirmAddPhase} disabled={!newPhaseName.trim()}>添加</Button>
+          </>
+        }
+      >
+        <div className="p-6">
+          <Input
+            type="text"
+            value={newPhaseName}
+            onChange={e => setNewPhaseName(e.target.value)}
+            placeholder="输入阶段名称"
+            autoFocus
+            onKeyDown={e => e.key === 'Enter' && confirmAddPhase()}
+          />
+        </div>
+      </Modal>
+
+      {/* Edit Phase Dialog */}
+      <Modal
+        open={!!editingPhaseKey}
+        onClose={cancelEditPhase}
+        size="sm"
+        title="编辑阶段名称"
+        footer={
+          <>
+            <Button variant="ghost" onClick={cancelEditPhase}>取消</Button>
+            <Button onClick={confirmEditPhase} disabled={!editingPhaseName.trim()}>保存</Button>
+          </>
+        }
+      >
+        <div className="p-6">
+          <Input
+            type="text"
+            value={editingPhaseName}
+            onChange={e => setEditingPhaseName(e.target.value)}
+            placeholder="输入阶段名称"
+            autoFocus
+            onKeyDown={e => e.key === 'Enter' && confirmEditPhase()}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
