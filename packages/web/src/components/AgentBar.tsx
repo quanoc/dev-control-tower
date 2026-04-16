@@ -129,7 +129,7 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
             `}
           >
             {/* Left: emoji */}
-            <span className="text-lg flex-shrink-0">{agent.emoji}</span>
+            <span className="text-lg flex-shrink-0">{agent.emoji || '🤖'}</span>
 
             {/* Right: two rows */}
             <div className="flex flex-col items-start">

@@ -38,7 +38,7 @@ export function upsertAgent(agent: Partial<Agent> & { id: string }): void {
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       role = excluded.role,
-      emoji = excluded.emoji,
+      emoji = COALESCE(NULLIF(excluded.emoji, ''), agents.emoji),
       description = COALESCE(NULLIF(excluded.description, ''), agents.description),
       path = excluded.path,
       skills = excluded.skills,

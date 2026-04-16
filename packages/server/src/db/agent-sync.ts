@@ -68,12 +68,16 @@ export function syncAgents(): void {
     const openclawAgents: OpenClawAgent[] = JSON.parse(openclawData);
 
     for (const agent of openclawAgents) {
-      // Read IDENTITY.md for description
+      // Read IDENTITY.md for description and emoji
       let description = agent.identityName || agent.name;
+      let emoji = agent.identityEmoji || '';
       try {
         const identityPath = join(agent.agentDir, 'IDENTITY.md');
         if (existsSync(identityPath)) {
           const identityContent = readFileSync(identityPath, 'utf-8');
+          // Extract emoji from IDENTITY.md
+          const emojiMatch = identityContent.match(/\*\*Emoji\*\*:\s*(.+)/);
+          if (emojiMatch) emoji = emojiMatch[1].trim();
           // Extract description from IDENTITY.md (use full content or first meaningful section)
           const descMatch = identityContent.match(/## 专业领域[\s\S]*?(?=##|$)/);
           if (descMatch) {
@@ -102,7 +106,7 @@ export function syncAgents(): void {
         VALUES (?, ?, 'openclaw', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
-          emoji = COALESCE(excluded.emoji, agents.emoji),
+          emoji = COALESCE(NULLIF(excluded.emoji, ''), agents.emoji),
           description = excluded.description,
           path = excluded.path,
           metadata = excluded.metadata,
@@ -114,7 +118,7 @@ export function syncAgents(): void {
         agent.id,
         agent.name,
         agent.name, // role (use name as default)
-        agent.identityEmoji || '',
+        emoji || '🤖',
         description,
         workspace, // Use agentDir (not workspace) for IDENTITY.md
         JSON.stringify({ model: agent.model }),
