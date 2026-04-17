@@ -201,6 +201,7 @@ export function ComponentPickerDrawer({ phaseKey, onSelect, onClose }: Component
                 {ACTOR_TABS.map(tab => (
                   <button
                     key={tab.key}
+                    type="button"
                     onClick={() => setActiveTab(tab.key)}
                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs transition-colors ${
                       activeTab === tab.key
