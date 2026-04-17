@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dev-control-tower Architecture Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #22d3ee;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      min-width: 900px;
+      display: block;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .card ul {
+      list-style: none;
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .card li {
+      margin-bottom: 0.375rem;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #475569;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>dev-control-tower Architecture</h1>
+      </div>
+      <p class="subtitle">AI 研发控制台 - 基于 Monorepo 的多 Agent 协作流水线管理系统</p>
+    </div>
+
+    <!-- Main Diagram -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 580">
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- Monorepo Boundary -->
+        <rect x="160" y="40" width="680" height="480" rx="12" fill="rgba(251, 191, 36, 0.05)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="172" y="58" fill="#fbbf24" font-size="10" font-weight="600">Monorepo (pnpm workspaces)</text>
+
+        <!-- External: Users -->
+        <rect x="30" y="230" width="100" height="50" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="80" y="250" fill="white" font-size="11" font-weight="600" text-anchor="middle">Users</text>
+        <text x="80" y="266" fill="#94a3b8" font-size="9" text-anchor="middle">Browser</text>
+
+        <!-- External: OpenClaw -->
+        <rect x="860" y="70" width="110" height="50" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="915" y="90" fill="white" font-size="11" font-weight="600" text-anchor="middle">OpenClaw</text>
+        <text x="915" y="106" fill="#94a3b8" font-size="9" text-anchor="middle">Config Sync</text>
+
+        <!-- External: Claude -->
+        <rect x="860" y="140" width="110" height="50" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="915" y="160" fill="white" font-size="11" font-weight="600" text-anchor="middle">Claude</text>
+        <text x="915" y="176" fill="#94a3b8" font-size="9" text-anchor="middle">Agent Sync</text>
+
+        <!-- packages/shared -->
+        <rect x="180" y="70" width="150" height="60" rx="6" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="255" y="92" fill="white" font-size="11" font-weight="600" text-anchor="middle">@pipeline/shared</text>
+        <text x="255" y="108" fill="#94a3b8" font-size="9" text-anchor="middle">Type Definitions</text>
+        <text x="255" y="122" fill="#fb7185" font-size="8" text-anchor="middle">src/types.ts</text>
+
+        <!-- packages/web (Frontend) -->
+        <rect x="180" y="160" width="300" height="180" rx="8" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="330" y="182" fill="white" font-size="12" font-weight="600" text-anchor="middle">@pipeline/web</text>
+        <text x="330" y="200" fill="#94a3b8" font-size="9" text-anchor="middle">React 19 + Vite + Tailwind</text>
+
+        <!-- Web: Pages -->
+        <rect x="195" y="212" width="80" height="40" rx="4" fill="rgba(8, 51, 68, 0.6)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="235" y="228" fill="#22d3ee" font-size="8" font-weight="500" text-anchor="middle">pages/</text>
+        <text x="235" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">Tasks • Agents</text>
+
+        <!-- Web: Components -->
+        <rect x="285" y="212" width="90" height="40" rx="4" fill="rgba(8, 51, 68, 0.6)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="330" y="228" fill="#22d3ee" font-size="8" font-weight="500" text-anchor="middle">components/</text>
+        <text x="330" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">Pipeline • Agent</text>
+
+        <!-- Web: Store -->
+        <rect x="385" y="212" width="80" height="40" rx="4" fill="rgba(8, 51, 68, 0.6)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="425" y="228" fill="#22d3ee" font-size="8" font-weight="500" text-anchor="middle">store/</text>
+        <text x="425" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">Zustand</text>
+
+        <!-- Web: UI Components list -->
+        <text x="330" y="270" fill="#94a3b8" font-size="8" text-anchor="middle">• PipelineFlow / PipelineManager</text>
+        <text x="330" y="284" fill="#94a3b8" font-size="8" text-anchor="middle">• AgentLibrary / AgentBar</text>
+        <text x="330" y="298" fill="#94a3b8" font-size="8" text-anchor="middle">• TaskList / StageEditor</text>
+        <text x="330" y="312" fill="#94a3b8" font-size="8" text-anchor="middle">• Modal / Card / Button / Badge</text>
+        <text x="330" y="330" fill="#22d3ee" font-size="8" text-anchor="middle">localhost:5173</text>
+
+        <!-- packages/server (Backend) -->
+        <rect x="500" y="160" width="320" height="280" rx="8" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="660" y="182" fill="white" font-size="12" font-weight="600" text-anchor="middle">@pipeline/server</text>
+        <text x="660" y="200" fill="#94a3b8" font-size="9" text-anchor="middle">Express + TypeScript + SQLite</text>
+
+        <!-- Server: Routes -->
+        <rect x="515" y="212" width="90" height="55" rx="4" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1"/>
+        <text x="560" y="228" fill="#34d399" font-size="8" font-weight="500" text-anchor="middle">routes/</text>
+        <text x="560" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">agents.ts</text>
+        <text x="560" y="256" fill="#94a3b8" font-size="7" text-anchor="middle">tasks.ts</text>
+        <text x="560" y="268" fill="#94a3b8" font-size="7" text-anchor="middle">pipelines.ts</text>
+
+        <!-- Server: Engine -->
+        <rect x="615" y="212" width="90" height="55" rx="4" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1"/>
+        <text x="660" y="228" fill="#34d399" font-size="8" font-weight="500" text-anchor="middle">engine/</text>
+        <text x="660" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">scheduler.ts</text>
+        <text x="660" y="256" fill="#94a3b8" font-size="7" text-anchor="middle">state machine</text>
+        <text x="660" y="268" fill="#94a3b8" font-size="7" text-anchor="middle">phase runner</text>
+
+        <!-- Server: DB -->
+        <rect x="715" y="212" width="90" height="55" rx="4" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1"/>
+        <text x="760" y="228" fill="#34d399" font-size="8" font-weight="500" text-anchor="middle">db/</text>
+        <text x="760" y="244" fill="#94a3b8" font-size="7" text-anchor="middle">queries.ts</text>
+        <text x="760" y="256" fill="#94a3b8" font-size="7" text-anchor="middle">migrate.ts</text>
+        <text x="760" y="268" fill="#94a3b8" font-size="7" text-anchor="middle">agent-sync.ts</text>
+
+        <!-- Server: Executors -->
+        <rect x="515" y="280" width="90" height="40" rx="4" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1"/>
+        <text x="560" y="296" fill="#34d399" font-size="8" font-weight="500" text-anchor="middle">executors/</text>
+        <text x="560" y="312" fill="#94a3b8" font-size="7" text-anchor="middle">step executor</text>
+
+        <!-- Server: OpenClaw -->
+        <rect x="615" y="280" width="90" height="40" rx="4" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1"/>
+        <text x="660" y="296" fill="#34d399" font-size="8" font-weight="500" text-anchor="middle">openclaw/</text>
+        <text x="660" y="312" fill="#94a3b8" font-size="7" text-anchor="middle">integration</text>
+
+        <!-- Server: API endpoints list -->
+        <text x="660" y="340" fill="#94a3b8" font-size="8" text-anchor="middle">API: /api/agents • /api/tasks • /api/pipelines</text>
+        <text x="660" y="354" fill="#94a3b8" font-size="8" text-anchor="middle">• Agent CRUD + Sync + Commands</text>
+        <text x="660" y="368" fill="#94a3b8" font-size="8" text-anchor="middle">• Task CRUD + Pipeline Actions</text>
+        <text x="660" y="382" fill="#94a3b8" font-size="8" text-anchor="middle">• Templates + Instances + Components</text>
+        <text x="660" y="410" fill="#34d399" font-size="8" text-anchor="middle">WebSocket • Pipeline Scheduler</text>
+        <text x="660" y="430" fill="#34d399" font-size="8" text-anchor="middle">localhost:3001</text>
+
+        <!-- Database: SQLite -->
+        <rect x="515" y="450" width="150" height="50" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="590" y="470" fill="white" font-size="11" font-weight="600" text-anchor="middle">SQLite</text>
+        <text x="590" y="486" fill="#94a3b8" font-size="9" text-anchor="middle">better-sqlite3</text>
+        <text x="590" y="498" fill="#a78bfa" font-size="8" text-anchor="middle">data/pipeline.db</text>
+
+        <!-- Arrows: User → Web -->
+        <line x1="130" y1="255" x2="178" y2="255" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="154" y="249" fill="#94a3b8" font-size="9" text-anchor="middle">HTTP</text>
+
+        <!-- Arrows: Web → Server -->
+        <line x1="480" y1="250" x2="498" y2="250" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="489" y="244" fill="#94a3b8" font-size="8" text-anchor="middle">REST</text>
+        <line x1="480" y1="270" x2="498" y2="270" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="489" y="264" fill="#94a3b8" font-size="7" text-anchor="middle">WS</text>
+
+        <!-- Arrows: Server → SQLite -->
+        <line x1="590" y1="440" x2="590" y2="448" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrows: shared → web -->
+        <path d="M 255 130 L 255 158" fill="none" stroke="#fb7185" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrows: shared → server -->
+        <path d="M 330 100 L 330 100 Q 400 100 400 130 L 400 158" fill="none" stroke="#fb7185" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrows: OpenClaw → Server -->
+        <line x1="858" y1="95" x2="808" y2="95" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowhead)"/>
+        <text x="833" y="89" fill="#94a3b8" font-size="8" text-anchor="middle">sync</text>
+
+        <!-- Arrows: Claude → Server -->
+        <line x1="858" y1="165" x2="808" y2="165" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowhead)"/>
+        <text x="833" y="159" fill="#94a3b8" font-size="8" text-anchor="middle">sync</text>
+
+        <!-- Legend -->
+        <text x="720" y="515" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="720" y="527" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="742" y="535" fill="#94a3b8" font-size="8">Frontend</text>
+
+        <rect x="720" y="543" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="742" y="551" fill="#94a3b8" font-size="8">Backend</text>
+
+        <rect x="720" y="559" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="742" y="567" fill="#94a3b8" font-size="8">Database</text>
+
+        <rect x="800" y="527" width="16" height="10" rx="2" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="822" y="535" fill="#94a3b8" font-size="8">Shared Types</text>
+
+        <rect x="800" y="543" width="16" height="10" rx="2" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="822" y="551" fill="#94a3b8" font-size="8">External</text>
+
+        <line x1="800" y1="565" x2="816" y2="565" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="822" y="568" fill="#94a3b8" font-size="8">Sync Flow</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>前端技术栈</h3>
+        </div>
+        <ul>
+          <li>• React 19 + TypeScript</li>
+          <li>• Vite 构建工具</li>
+          <li>• Tailwind CSS 样式</li>
+          <li>• Zustand 状态管理</li>
+          <li>• Lucide React 图标库</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>后端技术栈</h3>
+        </div>
+        <ul>
+          <li>• Express + TypeScript</li>
+          <li>• SQLite (better-sqlite3)</li>
+          <li>• WebSocket 实时通信</li>
+          <li>• Pipeline Scheduler</li>
+          <li>• OpenClaw/Claude 集成</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>核心业务模块</h3>
+        </div>
+        <ul>
+          <li>• Agent 管理 - 多 Agent 协作</li>
+          <li>• Pipeline Templates - 流水线模板</li>
+          <li>• Pipeline Instances - 流水线实例</li>
+          <li>• Tasks - 任务调度与执行</li>
+          <li>• Components - 流水线组件库</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      dev-control-tower • AI Pipeline Dashboard • Monorepo Architecture
+    </p>
+  </div>
+</body>
+</html>
