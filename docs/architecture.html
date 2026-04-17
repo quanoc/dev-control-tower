@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Control Tower 架构图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 40px;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 32px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        .architecture {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .layer {
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+        }
+        
+        .layer-title {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #00d4ff;
+            color: #1a1a2e;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        /* 外部集成层 */
+        .external-layer {
+            background: rgba(255, 107, 107, 0.1);
+            border: 2px solid rgba(255, 107, 107, 0.3);
+        }
+        
+        /* 前端层 */
+        .frontend-layer {
+            background: rgba(78, 205, 196, 0.1);
+            border: 2px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        /* API层 */
+        .api-layer {
+            background: rgba(69, 183, 209, 0.1);
+            border: 2px solid rgba(69, 183, 209, 0.3);
+        }
+        
+        /* 核心业务层 */
+        .core-layer {
+            background: rgba(150, 111, 214, 0.1);
+            border: 2px solid rgba(150, 111, 214, 0.3);
+        }
+        
+        /* 数据层 */
+        .data-layer {
+            background: rgba(247, 183, 49, 0.1);
+            border: 2px solid rgba(247, 183, 49, 0.3);
+        }
+        
+        .components {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .component {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px 24px;
+            min-width: 140px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .component:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .component h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        
+        .component p {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .component ul {
+            list-style: none;
+            text-align: left;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 8px;
+        }
+        
+        .component ul li {
+            padding: 2px 0;
+            padding-left: 12px;
+            position: relative;
+        }
+        
+        .component ul li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #00d4ff;
+        }
+        
+        /* 连接箭头 */
+        .arrow-down {
+            text-align: center;
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.3);
+            margin: -10px 0;
+        }
+        
+        /* 特殊组件样式 */
+        .external .component {
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+        
+        .external .component h3 {
+            color: #ff6b6b;
+        }
+        
+        .frontend .component {
+            border-color: rgba(78, 205, 196, 0.3);
+        }
+        
+        .frontend .component h3 {
+            color: #4ecdc4;
+        }
+        
+        .api .component {
+            border-color: rgba(69, 183, 209, 0.3);
+        }
+        
+        .api .component h3 {
+            color: #45b7d1;
+        }
+        
+        .core .component {
+            border-color: rgba(150, 111, 214, 0.3);
+        }
+        
+        .core .component h3 {
+            color: #966fd6;
+        }
+        
+        .data .component {
+            border-color: rgba(247, 183, 49, 0.3);
+        }
+        
+        .data .component h3 {
+            color: #f7b731;
+        }
+        
+        /* 数据流向 */
+        .flow-section {
+            margin-top: 40px;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+        }
+        
+        .flow-section h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .flow-step {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 14px;
+        }
+        
+        .flow-arrow {
+            color: #00d4ff;
+            font-size: 20px;
+        }
+        
+        /* 端口信息 */
+        .port-info {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .legend {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+        
+        .legend h3 {
+            margin-bottom: 16px;
+            color: #00d4ff;
+        }
+        
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dev Control Tower 架构图</h1>
+        <p style="text-align: center; color: rgba(255,255,255,0.5); margin-bottom: 40px;">
+            AI 研发控制台 - 多 Agent 协作流水线管理系统
+        </p>
+        
+        <div class="architecture">
+            <!-- 外部集成层 -->
+            <div class="layer external-layer">
+                <span class="layer-title">外部集成</span>
+                <div class="components external">
+                    <div class="component">
+                        <h3>OpenClaw</h3>
+                        <p>Agent 运行时</p>
+                        <ul>
+                            <li>Agent 注册</li>
+                            <li>状态同步</li>
+                            <li>任务执行</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h3>Claude Code</h3>
+                        <p>AI 编码助手</p>
+                        <ul>
+                            <li>代码生成</li>
+                            <li>代码审查</li>
+                            <li>智能补全</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-down">↓</div>
+            
+            <!-- 前端层 -->
+            <div class="layer frontend-layer">
+                <span class="layer-title">前端层</span>
+                <span class="port-info">Port: 5173</span>
+                <div class="components frontend">
+                    <div class="component">
+                        <h3>React 19</h3>
+                        <p>UI 框架</p>
+                    </div>
+                    <div class="component">
+                        <h3>Vite</h3>
+                        <p>构建工具</p>
+                    </div>
+                    <div class="component">
+                        <h3>Zustand</h3>
+                        <p>状态管理</p>
+                    </div>
+                    <div class="component">
+                        <h3>TailwindCSS</h3>
+                        <p>样式系统</p>
+                    </div>
+                    <div class="component">
+                        <h3>Lucide Icons</h3>
+                        <p>图标库</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-down">↓</div>
+            
+            <!-- API 层 -->
+            <div class="layer api-layer">
+                <span class="layer-title">API 层</span>
+                <span class="port-info">Port: 3001</span>
+                <div class="components api">
+                    <div class="component">
+                        <h3>Express.js</h3>
+                        <p>Web 框架</p>
+                    </div>
+                    <div class="component">
+                        <h3>CORS</h3>
+                        <p>跨域处理</p>
+                    </div>
+                    <div class="component">
+                        <h3>API Routes</h3>
+                        <ul>
+                            <li>/api/agents</li>
+                            <li>/api/tasks</li>
+                            <li>/api/pipelines</li>
+                            <li>/api/executor</li>
+                            <li>/api/scheduler</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-down">↓</div>
+            
+            <!-- 核心业务层 -->
+            <div class="layer core-layer">
+                <span class="layer-title">核心业务层</span>
+                <div class="components core">
+                    <div class="component">
+                        <h3>Agent Manager</h3>
+                        <p>Agent 管理</p>
+                        <ul>
+                            <li>自动同步</li>
+                            <li>角色标签</li>
+                            <li>技能管理</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h3>Pipeline Engine</h3>
+                        <p>流水线引擎</p>
+                        <ul>
+                            <li>模板管理</li>
+                            <li>实例编排</li>
+                            <li>状态机</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h3>Task Scheduler</h3>
+                        <p>任务调度</p>
+                        <ul>
+                            <li>任务队列</li>
+                            <li>优先级</li>
+                            <li>超时处理</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h3>Executor</h3>
+                        <p>执行器</p>
+                        <ul>
+                            <li>Plan</li>
+                            <li>TDD</li>
+                            <li>Code</li>
+                            <li>Review</li>
+                            <li>Commit</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-down">↓</div>
+            
+            <!-- 数据层 -->
+            <div class="layer data-layer">
+                <span class="layer-title">数据层</span>
+                <div class="components data">
+                    <div class="component">
+                        <h3>SQLite</h3>
+                        <p>关系型数据库</p>
+                    </div>
+                    <div class="component">
+                        <h3>Better-SQLite3</h3>
+                        <p>Node.js 驱动</p>
+                    </div>
+                    <div class="component">
+                        <h3>数据表</h3>
+                        <ul>
+                            <li>agents</li>
+                            <li>tasks</li>
+                            <li>pipeline_templates</li>
+                            <li>pipeline_instances</li>
+                            <li>pipeline_components</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Agent 工作流 -->
+        <div class="flow-section">
+            <h2>Agent 工作流</h2>
+            <div class="flow-diagram">
+                <div class="flow-step">Plan</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">TDD</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">Code</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">Review</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">Commit</div>
+            </div>
+        </div>
+        
+        <!-- 任务状态流转 -->
+        <div class="flow-section">
+            <h2>任务状态流转</h2>
+            <div class="flow-diagram">
+                <div class="flow-step">pending</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">running</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">completed / failed</div>
+            </div>
+        </div>
+        
+        <!-- 图例 -->
+        <div class="legend">
+            <h3>技术栈图例</h3>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(255, 107, 107, 0.5);"></div>
+                <span>外部集成</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(78, 205, 196, 0.5);"></div>
+                <span>前端层</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(69, 183, 209, 0.5);"></div>
+                <span>API 层</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(150, 111, 214, 0.5);"></div>
+                <span>核心业务</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(247, 183, 49, 0.5);"></div>
+                <span>数据层</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
