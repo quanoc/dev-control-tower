@@ -44,6 +44,8 @@ interface PipelinePreviewProps {
   phases: PipelinePhase[];
   selectedPhase: string | null;
   selectedStep: { phaseKey: string; stepIndex: number } | null;
+  dragSource: { phaseKey: string; stepIndex: number } | null;
+  dropTarget: { phaseKey: string; stepIndex: number } | null;
   onSelectStep: (phaseKey: string, stepIndex: number) => void;
   onRemoveStep: (phaseKey: string, stepIndex: number) => void;
   onAddStepToPhase: (phaseKey: string) => void;
@@ -51,6 +53,7 @@ interface PipelinePreviewProps {
   onDragStart: (phaseKey: string, stepIndex: number) => void;
   onDragOver: (e: React.DragEvent, phaseKey: string, stepIndex: number) => void;
   onDragEnd: () => void;
+  onDrop: (phaseKey: string, stepIndex: number) => void;
   onAddCustomPhase?: () => void;
   onRemoveCustomPhase?: (phaseKey: string) => void;
   onAddPhaseAfter?: (afterPhaseKey: string) => void;
@@ -82,10 +85,10 @@ function getBatchedSteps(phase: PipelinePhase): { steps: PipelineStep[]; isParal
 }
 
 export function PipelinePreview({
-  phases, selectedPhase, selectedStep,
+  phases, selectedPhase, selectedStep, dragSource, dropTarget,
   onSelectStep, onRemoveStep, onAddStepToPhase,
   onEditPhase,
-  onDragStart, onDragOver, onDragEnd,
+  onDragStart, onDragOver, onDragEnd, onDrop,
   onAddCustomPhase, onRemoveCustomPhase, onAddPhaseAfter,
   onToggleBatchBoundary,
 }: PipelinePreviewProps) {
@@ -102,6 +105,8 @@ export function PipelinePreview({
     const def = getActionDef(step.action);
     const actorBadge = getActorBadge(step.actorType);
     const isSelected = selectedStep?.phaseKey === phaseKey && selectedStep?.stepIndex === stepIndex;
+    const isDragging = dragSource?.phaseKey === phaseKey && dragSource?.stepIndex === stepIndex;
+    const isDropTarget = dropTarget?.phaseKey === phaseKey && dropTarget?.stepIndex === stepIndex;
 
     return (
       <div
@@ -110,11 +115,16 @@ export function PipelinePreview({
         onDragStart={() => onDragStart(phaseKey, stepIndex)}
         onDragOver={(e) => onDragOver(e, phaseKey, stepIndex)}
         onDragEnd={onDragEnd}
+        onDrop={(e) => { e.preventDefault(); onDrop(phaseKey, stepIndex); }}
         onClick={() => onSelectStep(phaseKey, stepIndex)}
         className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-lg border-2 cursor-pointer transition-all text-left ${
-          isSelected
-            ? `${colors.border} ${colors.bg} ring-1 ring-offset-1 ring-offset-gray-900 ${colors.ring}`
-            : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+          isDragging
+            ? 'opacity-40 border-gray-600 bg-gray-800/30'
+            : isSelected
+              ? `${colors.border} ${colors.bg} ring-1 ring-offset-1 ring-offset-gray-900 ${colors.ring}`
+              : isDropTarget
+                ? 'border-cyan-500 bg-cyan-500/10 ring-2 ring-cyan-500/30'
+                : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
         }`}
       >
         <GripVertical className="w-3 h-3 text-gray-600 cursor-grab active:cursor-grabbing flex-shrink-0" />

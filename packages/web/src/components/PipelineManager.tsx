@@ -67,6 +67,10 @@ export function PipelineManager() {
   const [newPhaseName, setNewPhaseName] = useState('');
   const [pickerPhase, setPickerPhase] = useState<PhaseKey | null>(null);
 
+  // Drag state
+  const [dragSource, setDragSource] = useState<{ phaseKey: string; stepIndex: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ phaseKey: string; stepIndex: number } | null>(null);
+
   useEffect(() => {
     loadTemplates();
   }, []);
@@ -191,33 +195,53 @@ export function PipelineManager() {
       if (!phase || phase.steps.length <= 1) return prev;
 
       const batches = phase.batches || phase.steps.map(() => 1);
-      let currentIdx = 0;
-      let newBatches: number[] = [];
-      let found = false;
 
-      for (const batchSize of batches) {
-        const batchStart = currentIdx;
-        const batchEnd = currentIdx + batchSize;
+      // Find which batch the gap after afterStepIndex belongs to
+      // afterStepIndex = N means the gap between step N and step N+1
+      let boundaryBatchIndex = -1;
+      let isInsideBatch = false;
+      let splitPointInBatch = 0;
+      let pos = 0;
 
-        if (afterStepIndex >= batchStart && afterStepIndex < batchEnd - 1) {
-          // Clicked inside a batch with multiple steps - split this batch
-          const splitPoint = afterStepIndex - batchStart + 1;
-          newBatches.push(splitPoint);
-          newBatches.push(batchSize - splitPoint);
-          found = true;
-        } else if (afterStepIndex === batchEnd - 1 && !found) {
-          // Clicked at end of batch - check if next batch should merge
-          if (newBatches.length > 0) {
-            // Merge with previous batch
-            newBatches[newBatches.length - 1] += batchSize;
-          } else {
-            newBatches.push(batchSize);
-          }
-          found = true;
-        } else {
-          newBatches.push(batchSize);
+      for (let i = 0; i < batches.length; i++) {
+        const batchSize = batches[i];
+        const batchEnd = pos + batchSize;
+
+        if (afterStepIndex >= pos && afterStepIndex < batchEnd - 1) {
+          // Gap is inside a multi-step batch - split this batch
+          isInsideBatch = true;
+          boundaryBatchIndex = i;
+          splitPointInBatch = afterStepIndex - pos + 1;
+          break;
+        } else if (afterStepIndex === batchEnd - 1) {
+          // Gap is at the end of this batch (between this batch and next)
+          boundaryBatchIndex = i;
+          break;
         }
-        currentIdx += batchSize;
+        pos = batchEnd;
+      }
+
+      let newBatches: number[];
+
+      if (isInsideBatch) {
+        // Split the batch at the gap position
+        const batchSize = batches[boundaryBatchIndex];
+        newBatches = [
+          ...batches.slice(0, boundaryBatchIndex),
+          splitPointInBatch,
+          batchSize - splitPointInBatch,
+          ...batches.slice(boundaryBatchIndex + 1),
+        ];
+      } else if (boundaryBatchIndex >= 0 && boundaryBatchIndex < batches.length - 1) {
+        // Merge current batch with the next batch
+        newBatches = [
+          ...batches.slice(0, boundaryBatchIndex),
+          batches[boundaryBatchIndex] + batches[boundaryBatchIndex + 1],
+          ...batches.slice(boundaryBatchIndex + 2),
+        ];
+      } else {
+        // No change (gap is at the very end, no next batch to merge)
+        return prev;
       }
 
       return {
@@ -289,12 +313,86 @@ export function PipelineManager() {
 
   // Drag handlers for PipelinePreview
   const handleDragStart = (phaseKey: string, stepIndex: number) => {
-    // Placeholder for drag functionality
+    setDragSource({ phaseKey, stepIndex });
+    setDropTarget(null);
   };
+
   const handleDragOver = (e: React.DragEvent, phaseKey: string, stepIndex: number) => {
     e.preventDefault();
+    if (dragSource && dragSource.phaseKey === phaseKey && dragSource.stepIndex !== stepIndex) {
+      setDropTarget({ phaseKey, stepIndex });
+    }
   };
-  const handleDragEnd = () => {};
+
+  const handleDragEnd = () => {
+    setDragSource(null);
+    setDropTarget(null);
+  };
+
+  const handleDrop = (targetPhaseKey: string, targetStepIndex: number) => {
+    if (!dragSource || dragSource.phaseKey !== targetPhaseKey || dragSource.stepIndex === targetStepIndex) {
+      setDragSource(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const sourceIndex = dragSource.stepIndex;
+    const targetIndex = targetStepIndex;
+
+    setFormData(prev => {
+      const phase = prev.phases.find(p => p.phaseKey === targetPhaseKey);
+      if (!phase) return prev;
+
+      const newSteps = [...phase.steps];
+      const [movedStep] = newSteps.splice(sourceIndex, 1);
+      newSteps.splice(targetIndex, 0, movedStep);
+
+      // Rebuild batches: preserve relative batch structure
+      // Each step stays in its original batch, just repositioned
+      const oldBatches = phase.batches || phase.steps.map(() => 1);
+
+      // Build a map of step key -> original batch index
+      const stepKeyToBatchIndex = new Map<string, number>();
+      let idx = 0;
+      for (let batchIdx = 0; batchIdx < oldBatches.length; batchIdx++) {
+        for (let i = 0; i < oldBatches[batchIdx] && idx < phase.steps.length; i++) {
+          stepKeyToBatchIndex.set(phase.steps[idx].key, batchIdx);
+          idx++;
+        }
+      }
+
+      // Count steps per batch index in new order
+      const batchCounts = new Map<number, number>();
+      for (const step of newSteps) {
+        const originalBatchIdx = stepKeyToBatchIndex.get(step.key) ?? 0;
+        batchCounts.set(originalBatchIdx, (batchCounts.get(originalBatchIdx) ?? 0) + 1);
+      }
+
+      // Build new batches array preserving original batch order
+      const usedBatchIndices = new Set(stepKeyToBatchIndex.values());
+      const newBatches = Array.from(usedBatchIndices)
+        .sort((a, b) => a - b)
+        .map(batchIdx => batchCounts.get(batchIdx) ?? 0)
+        .filter(size => size > 0);
+
+      return {
+        ...prev,
+        phases: prev.phases.map(p =>
+          p.phaseKey === targetPhaseKey
+            ? { ...p, steps: newSteps, batches: newBatches.length > 0 ? newBatches : undefined }
+            : p
+        ),
+      };
+    });
+
+    // Update selected step index if needed
+    if (selectedStep?.phaseKey === targetPhaseKey) {
+      setSelectedStep({ phaseKey: targetPhaseKey, stepIndex: targetStepIndex });
+    }
+
+    setDragSource(null);
+    setDropTarget(null);
+  };
 
   // Add phase after another phase - open dialog
   const addPhaseAfter = (afterPhaseKey: string) => {
@@ -562,6 +660,8 @@ export function PipelineManager() {
                 phases={formData.phases}
                 selectedPhase={null}
                 selectedStep={selectedStep}
+                dragSource={dragSource}
+                dropTarget={dropTarget}
                 onSelectStep={(pk, si) => { setSelectedStep({ phaseKey: pk, stepIndex: si }); setShowPicker(false); }}
                 onRemoveStep={removeStep}
                 onAddStepToPhase={(pk) => { setShowPicker(true); setPickerPhase(pk as PhaseKey); setSelectedStep(null); }}
@@ -570,6 +670,7 @@ export function PipelineManager() {
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
                 onAddPhaseAfter={addPhaseAfter}
                 onToggleBatchBoundary={toggleBatchBoundary}
               />
