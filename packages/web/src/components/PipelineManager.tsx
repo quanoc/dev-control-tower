@@ -425,7 +425,7 @@ export function PipelineManager() {
     setDropTarget(null);
   };
 
-  // Drop on a gap - insert as serial
+  // Drop on a gap - insert as serial (separate from any parallel group)
   const handleDropGap = (targetPhaseKey: string, afterStepIndex: number) => {
     if (!dragSource || dragSource.phaseKey !== targetPhaseKey) {
       setDragSource(null);
@@ -434,16 +434,6 @@ export function PipelineManager() {
     }
 
     const sourceIndex = dragSource.stepIndex;
-    // Insert position: afterStepIndex means insert after that index
-    // -1 means insert at beginning
-    const insertIndex = afterStepIndex < sourceIndex ? afterStepIndex + 1 : afterStepIndex;
-
-    if (sourceIndex === insertIndex || (sourceIndex < insertIndex && sourceIndex === insertIndex - 1)) {
-      // No actual move needed
-      setDragSource(null);
-      setDropTarget(null);
-      return;
-    }
 
     setFormData(prev => {
       const phase = prev.phases.find(p => p.phaseKey === targetPhaseKey);
@@ -451,61 +441,58 @@ export function PipelineManager() {
 
       const oldBatches = phase.batches || phase.steps.map(() => 1);
 
-      // Find which batch the source step is in
+      // Build stepKey -> batchIndex map
+      const stepKeyToBatch = new Map<string, number>();
       let pos = 0;
-      let sourceBatchIndex = -1;
       for (let batchIdx = 0; batchIdx < oldBatches.length; batchIdx++) {
-        for (let i = 0; i < oldBatches[batchIdx]; i++) {
-          if (pos === sourceIndex) {
-            sourceBatchIndex = batchIdx;
-            break;
-          }
+        for (let i = 0; i < oldBatches[batchIdx] && pos < phase.steps.length; i++) {
+          stepKeyToBatch.set(phase.steps[pos].key, batchIdx);
           pos++;
         }
-        if (sourceBatchIndex >= 0) break;
       }
 
-      // Remove source step from its batch
+      const movedStepKey = phase.steps[sourceIndex].key;
+
+      // Rebuild steps array
       const newSteps = [...phase.steps];
       const [movedStep] = newSteps.splice(sourceIndex, 1);
 
-      // Determine the new batch for the moved step (serial = new batch of size 1)
-      // Find where to insert the new batch
-      const newBatches = [...oldBatches];
-
-      // Decrease source batch
-      if (newBatches[sourceBatchIndex] > 1) {
-        newBatches[sourceBatchIndex]--;
+      // Calculate insert position
+      let insertPos: number;
+      if (afterStepIndex === -1) {
+        insertPos = 0;
+      } else if (afterStepIndex < sourceIndex) {
+        insertPos = afterStepIndex + 1;
       } else {
-        newBatches.splice(sourceBatchIndex, 1);
+        insertPos = afterStepIndex;
       }
 
-      // Calculate where to insert the new serial step
-      // afterStepIndex refers to original indices, need to adjust for removal
-      const adjustedAfterIndex = sourceIndex <= afterStepIndex ? afterStepIndex - 1 : afterStepIndex;
+      newSteps.splice(insertPos, 0, movedStep);
 
-      // Find the batch index for the insertion position
-      let batchInsertPos = 0;
-      let currentPos = 0;
-      for (let batchIdx = 0; batchIdx < newBatches.length; batchIdx++) {
-        if (currentPos + newBatches[batchIdx] - 1 === adjustedAfterIndex) {
-          batchInsertPos = batchIdx + 1;
-          break;
+      // Rebuild batches based on original batch membership
+      const newBatches: number[] = [];
+      let i = 0;
+      while (i < newSteps.length) {
+        const step = newSteps[i];
+        if (step.key === movedStepKey) {
+          // Moved step becomes standalone serial batch
+          newBatches.push(1);
+          i++;
+        } else {
+          // Find adjacent steps from the same original batch
+          const batchIdx = stepKeyToBatch.get(step.key) ?? 0;
+          let count = 0;
+          while (i + count < newSteps.length) {
+            const nextStep = newSteps[i + count];
+            if (nextStep.key === movedStepKey) break;
+            const nextBatchIdx = stepKeyToBatch.get(nextStep.key) ?? 0;
+            if (nextBatchIdx !== batchIdx) break;
+            count++;
+          }
+          newBatches.push(count > 0 ? count : 1);
+          i += count > 0 ? count : 1;
         }
-        if (currentPos > adjustedAfterIndex) {
-          batchInsertPos = batchIdx;
-          break;
-        }
-        currentPos += newBatches[batchIdx];
-        batchInsertPos = batchIdx + 1;
       }
-
-      // Insert new batch of size 1 at the calculated position
-      newBatches.splice(batchInsertPos, 0, 1);
-
-      // Insert step at the correct position
-      const finalInsertIndex = adjustedAfterIndex + 1;
-      newSteps.splice(finalInsertIndex, 0, movedStep);
 
       return {
         ...prev,
