@@ -7,7 +7,7 @@ import { Input, TextArea, Select, FormField } from './ui/Input';
 import { Badge } from './ui/Badge';
 import { SectionHeader } from './ui/SectionHeader';
 import type { PipelineTemplate, PipelinePhase, PipelineStep, PhaseKey, AgentActionType, HumanGateType, SystemFlowType } from '@pipeline/shared';
-import { PipelinePreview } from './PipelinePreview';
+import { PipelinePreview, type DropType, type DropTargetInfo } from './PipelinePreview';
 import { StepDrawer } from './StepDrawer';
 import { ComponentPickerDrawer } from './ComponentPickerDrawer';
 import { getActionDef, getPhaseDef, PRESET_TEMPLATES } from '@pipeline/shared';
@@ -69,7 +69,7 @@ export function PipelineManager() {
 
   // Drag state
   const [dragSource, setDragSource] = useState<{ phaseKey: string; stepIndex: number } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ phaseKey: string; stepIndex: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTargetInfo | null>(null);
 
   useEffect(() => {
     loadTemplates();
@@ -317,11 +317,24 @@ export function PipelineManager() {
     setDropTarget(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, phaseKey: string, stepIndex: number) => {
+  // Drag over a step - merge as parallel
+  const handleDragOverStep = (e: React.DragEvent, phaseKey: string, stepIndex: number) => {
     e.preventDefault();
     if (dragSource && dragSource.phaseKey === phaseKey && dragSource.stepIndex !== stepIndex) {
-      setDropTarget({ phaseKey, stepIndex });
+      setDropTarget({ phaseKey, targetStepIndex: stepIndex, dropType: 'parallel' });
     }
+  };
+
+  // Drag over a gap - insert as serial
+  const handleDragOverGap = (phaseKey: string, afterStepIndex: number) => {
+    if (dragSource && dragSource.phaseKey === phaseKey) {
+      // Can insert after any position, including before first step (afterStepIndex = -1)
+      setDropTarget({ phaseKey, targetStepIndex: afterStepIndex, dropType: 'serial' });
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDropTarget(null);
   };
 
   const handleDragEnd = () => {
@@ -329,7 +342,8 @@ export function PipelineManager() {
     setDropTarget(null);
   };
 
-  const handleDrop = (targetPhaseKey: string, targetStepIndex: number) => {
+  // Drop on a step - merge as parallel
+  const handleDropStep = (targetPhaseKey: string, targetStepIndex: number) => {
     if (!dragSource || dragSource.phaseKey !== targetPhaseKey || dragSource.stepIndex === targetStepIndex) {
       setDragSource(null);
       setDropTarget(null);
@@ -343,52 +357,165 @@ export function PipelineManager() {
       const phase = prev.phases.find(p => p.phaseKey === targetPhaseKey);
       if (!phase) return prev;
 
-      const newSteps = [...phase.steps];
-      const [movedStep] = newSteps.splice(sourceIndex, 1);
-      newSteps.splice(targetIndex, 0, movedStep);
-
-      // Rebuild batches: preserve relative batch structure
-      // Each step stays in its original batch, just repositioned
       const oldBatches = phase.batches || phase.steps.map(() => 1);
 
-      // Build a map of step key -> original batch index
-      const stepKeyToBatchIndex = new Map<string, number>();
-      let idx = 0;
+      // Find which batch the source and target steps are in
+      let pos = 0;
+      let sourceBatchIndex = -1;
+      let targetBatchIndex = -1;
+      let sourcePosInBatch = -1;
+      let targetPosInBatch = -1;
+
       for (let batchIdx = 0; batchIdx < oldBatches.length; batchIdx++) {
-        for (let i = 0; i < oldBatches[batchIdx] && idx < phase.steps.length; i++) {
-          stepKeyToBatchIndex.set(phase.steps[idx].key, batchIdx);
-          idx++;
+        const batchSize = oldBatches[batchIdx];
+        for (let i = 0; i < batchSize; i++) {
+          if (pos === sourceIndex) {
+            sourceBatchIndex = batchIdx;
+            sourcePosInBatch = i;
+          }
+          if (pos === targetIndex) {
+            targetBatchIndex = batchIdx;
+            targetPosInBatch = i;
+          }
+          pos++;
         }
       }
 
-      // Count steps per batch index in new order
-      const batchCounts = new Map<number, number>();
-      for (const step of newSteps) {
-        const originalBatchIdx = stepKeyToBatchIndex.get(step.key) ?? 0;
-        batchCounts.set(originalBatchIdx, (batchCounts.get(originalBatchIdx) ?? 0) + 1);
+      // Build new batches
+      if (sourceBatchIndex === targetBatchIndex) {
+        // Already in same batch - no change needed
+        return prev;
       }
 
-      // Build new batches array preserving original batch order
-      const usedBatchIndices = new Set(stepKeyToBatchIndex.values());
-      const newBatches = Array.from(usedBatchIndices)
-        .sort((a, b) => a - b)
-        .map(batchIdx => batchCounts.get(batchIdx) ?? 0)
-        .filter(size => size > 0);
+      // Remove source from its batch, add to target batch
+      const newBatches = [...oldBatches];
+
+      // Decrease source batch size (remove if becomes 0)
+      if (newBatches[sourceBatchIndex] > 1) {
+        newBatches[sourceBatchIndex]--;
+      } else {
+        newBatches.splice(sourceBatchIndex, 1);
+        // Adjust target batch index if it was after source
+        if (targetBatchIndex > sourceBatchIndex) {
+          targetBatchIndex--;
+        }
+      }
+
+      // Increase target batch size
+      newBatches[targetBatchIndex]++;
+
+      // Reorder steps: move source step to be adjacent with target
+      const newSteps = [...phase.steps];
+      const [movedStep] = newSteps.splice(sourceIndex, 1);
+      // Insert after target step
+      const insertIndex = sourceIndex < targetIndex ? targetIndex : targetIndex + 1;
+      newSteps.splice(insertIndex, 0, movedStep);
 
       return {
         ...prev,
         phases: prev.phases.map(p =>
           p.phaseKey === targetPhaseKey
-            ? { ...p, steps: newSteps, batches: newBatches.length > 0 ? newBatches : undefined }
+            ? { ...p, steps: newSteps, batches: newBatches }
             : p
         ),
       };
     });
 
-    // Update selected step index if needed
-    if (selectedStep?.phaseKey === targetPhaseKey) {
-      setSelectedStep({ phaseKey: targetPhaseKey, stepIndex: targetStepIndex });
+    setDragSource(null);
+    setDropTarget(null);
+  };
+
+  // Drop on a gap - insert as serial
+  const handleDropGap = (targetPhaseKey: string, afterStepIndex: number) => {
+    if (!dragSource || dragSource.phaseKey !== targetPhaseKey) {
+      setDragSource(null);
+      setDropTarget(null);
+      return;
     }
+
+    const sourceIndex = dragSource.stepIndex;
+    // Insert position: afterStepIndex means insert after that index
+    // -1 means insert at beginning
+    const insertIndex = afterStepIndex < sourceIndex ? afterStepIndex + 1 : afterStepIndex;
+
+    if (sourceIndex === insertIndex || (sourceIndex < insertIndex && sourceIndex === insertIndex - 1)) {
+      // No actual move needed
+      setDragSource(null);
+      setDropTarget(null);
+      return;
+    }
+
+    setFormData(prev => {
+      const phase = prev.phases.find(p => p.phaseKey === targetPhaseKey);
+      if (!phase) return prev;
+
+      const oldBatches = phase.batches || phase.steps.map(() => 1);
+
+      // Find which batch the source step is in
+      let pos = 0;
+      let sourceBatchIndex = -1;
+      for (let batchIdx = 0; batchIdx < oldBatches.length; batchIdx++) {
+        for (let i = 0; i < oldBatches[batchIdx]; i++) {
+          if (pos === sourceIndex) {
+            sourceBatchIndex = batchIdx;
+            break;
+          }
+          pos++;
+        }
+        if (sourceBatchIndex >= 0) break;
+      }
+
+      // Remove source step from its batch
+      const newSteps = [...phase.steps];
+      const [movedStep] = newSteps.splice(sourceIndex, 1);
+
+      // Determine the new batch for the moved step (serial = new batch of size 1)
+      // Find where to insert the new batch
+      const newBatches = [...oldBatches];
+
+      // Decrease source batch
+      if (newBatches[sourceBatchIndex] > 1) {
+        newBatches[sourceBatchIndex]--;
+      } else {
+        newBatches.splice(sourceBatchIndex, 1);
+      }
+
+      // Calculate where to insert the new serial step
+      // afterStepIndex refers to original indices, need to adjust for removal
+      const adjustedAfterIndex = sourceIndex <= afterStepIndex ? afterStepIndex - 1 : afterStepIndex;
+
+      // Find the batch index for the insertion position
+      let batchInsertPos = 0;
+      let currentPos = 0;
+      for (let batchIdx = 0; batchIdx < newBatches.length; batchIdx++) {
+        if (currentPos + newBatches[batchIdx] - 1 === adjustedAfterIndex) {
+          batchInsertPos = batchIdx + 1;
+          break;
+        }
+        if (currentPos > adjustedAfterIndex) {
+          batchInsertPos = batchIdx;
+          break;
+        }
+        currentPos += newBatches[batchIdx];
+        batchInsertPos = batchIdx + 1;
+      }
+
+      // Insert new batch of size 1 at the calculated position
+      newBatches.splice(batchInsertPos, 0, 1);
+
+      // Insert step at the correct position
+      const finalInsertIndex = adjustedAfterIndex + 1;
+      newSteps.splice(finalInsertIndex, 0, movedStep);
+
+      return {
+        ...prev,
+        phases: prev.phases.map(p =>
+          p.phaseKey === targetPhaseKey
+            ? { ...p, steps: newSteps, batches: newBatches }
+            : p
+        ),
+      };
+    });
 
     setDragSource(null);
     setDropTarget(null);
@@ -668,9 +795,12 @@ export function PipelineManager() {
                 onEditPhase={handleEditPhase}
                 onRemoveCustomPhase={(pk) => setFormData(prev => ({ ...prev, phases: prev.phases.filter(p => p.phaseKey !== pk) }))}
                 onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
+                onDragOverStep={handleDragOverStep}
+                onDragOverGap={handleDragOverGap}
+                onDragLeave={handleDragLeave}
                 onDragEnd={handleDragEnd}
-                onDrop={handleDrop}
+                onDropStep={handleDropStep}
+                onDropGap={handleDropGap}
                 onAddPhaseAfter={addPhaseAfter}
                 onToggleBatchBoundary={toggleBatchBoundary}
               />

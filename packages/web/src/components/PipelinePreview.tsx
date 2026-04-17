@@ -40,20 +40,32 @@ function getActorBadge(actorType: string): { bg: string; text: string } {
 
 const ACTOR_SHORT: Record<string, string> = { agent: 'Agent', human: '人工', system: '系统' };
 
+/** Drop type: merge as parallel or insert as serial */
+export type DropType = 'parallel' | 'serial';
+
+export interface DropTargetInfo {
+  phaseKey: string;
+  targetStepIndex: number;
+  dropType: DropType;
+}
+
 interface PipelinePreviewProps {
   phases: PipelinePhase[];
   selectedPhase: string | null;
   selectedStep: { phaseKey: string; stepIndex: number } | null;
   dragSource: { phaseKey: string; stepIndex: number } | null;
-  dropTarget: { phaseKey: string; stepIndex: number } | null;
+  dropTarget: DropTargetInfo | null;
   onSelectStep: (phaseKey: string, stepIndex: number) => void;
   onRemoveStep: (phaseKey: string, stepIndex: number) => void;
   onAddStepToPhase: (phaseKey: string) => void;
   onEditPhase?: (phaseKey: string) => void;
   onDragStart: (phaseKey: string, stepIndex: number) => void;
-  onDragOver: (e: React.DragEvent, phaseKey: string, stepIndex: number) => void;
+  onDragOverStep: (e: React.DragEvent, phaseKey: string, stepIndex: number) => void;
+  onDragOverGap: (phaseKey: string, afterStepIndex: number) => void;
+  onDragLeave: () => void;
   onDragEnd: () => void;
-  onDrop: (phaseKey: string, stepIndex: number) => void;
+  onDropStep: (phaseKey: string, targetStepIndex: number) => void;
+  onDropGap: (phaseKey: string, afterStepIndex: number) => void;
   onAddCustomPhase?: () => void;
   onRemoveCustomPhase?: (phaseKey: string) => void;
   onAddPhaseAfter?: (afterPhaseKey: string) => void;
@@ -88,7 +100,8 @@ export function PipelinePreview({
   phases, selectedPhase, selectedStep, dragSource, dropTarget,
   onSelectStep, onRemoveStep, onAddStepToPhase,
   onEditPhase,
-  onDragStart, onDragOver, onDragEnd, onDrop,
+  onDragStart, onDragOverStep, onDragOverGap, onDragLeave, onDragEnd,
+  onDropStep, onDropGap,
   onAddCustomPhase, onRemoveCustomPhase, onAddPhaseAfter,
   onToggleBatchBoundary,
 }: PipelinePreviewProps) {
@@ -106,16 +119,16 @@ export function PipelinePreview({
     const actorBadge = getActorBadge(step.actorType);
     const isSelected = selectedStep?.phaseKey === phaseKey && selectedStep?.stepIndex === stepIndex;
     const isDragging = dragSource?.phaseKey === phaseKey && dragSource?.stepIndex === stepIndex;
-    const isDropTarget = dropTarget?.phaseKey === phaseKey && dropTarget?.stepIndex === stepIndex;
+    const isDropTarget = dropTarget?.phaseKey === phaseKey && dropTarget?.targetStepIndex === stepIndex && dropTarget?.dropType === 'parallel';
 
     return (
       <div
         key={step.key}
         draggable
         onDragStart={() => onDragStart(phaseKey, stepIndex)}
-        onDragOver={(e) => onDragOver(e, phaseKey, stepIndex)}
+        onDragOver={(e) => onDragOverStep(e, phaseKey, stepIndex)}
         onDragEnd={onDragEnd}
-        onDrop={(e) => { e.preventDefault(); onDrop(phaseKey, stepIndex); }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropStep(phaseKey, stepIndex); }}
         onClick={() => onSelectStep(phaseKey, stepIndex)}
         className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-lg border-2 cursor-pointer transition-all text-left ${
           isDragging
@@ -149,35 +162,55 @@ export function PipelinePreview({
     );
   }
 
-  function renderBatchGap(phaseKey: string, afterStepIndex: number, isLast: boolean) {
-    if (isLast) return null;
-
+  function renderBatchGap(phaseKey: string, afterStepIndex: number) {
     const isHovered = hoveredGap?.phaseKey === phaseKey && hoveredGap?.afterStepIndex === afterStepIndex;
+    const isDropTarget = dropTarget?.phaseKey === phaseKey && dropTarget?.targetStepIndex === afterStepIndex && dropTarget?.dropType === 'serial';
+    const isFirstGap = afterStepIndex === -1;
 
     return (
       <div
-        className="relative py-1 -my-0.5 cursor-pointer group/gap"
+        className={`relative py-1.5 cursor-pointer group/gap transition-all ${
+          isDropTarget ? 'py-2 bg-cyan-500/20' : ''
+        }`}
         onMouseEnter={() => setHoveredGap({ phaseKey, afterStepIndex })}
         onMouseLeave={() => setHoveredGap(null)}
-        onClick={() => handleGapClick(phaseKey, afterStepIndex)}
+        onDragOver={(e) => { e.preventDefault(); onDragOverGap(phaseKey, afterStepIndex); }}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropGap(phaseKey, afterStepIndex); }}
+        onClick={() => !dragSource && !isFirstGap && handleGapClick(phaseKey, afterStepIndex)}
       >
+        {/* Drop indicator line */}
         <div className="flex items-center justify-center">
-          <div className={`w-px h-4 transition-all ${
+          <div className={`w-px transition-all ${
+            isDropTarget ? 'h-6 bg-cyan-400' :
             isHovered ? 'bg-cyan-400 w-0.5' : 'bg-gray-600'
           }`} />
         </div>
-        <div className={`absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 transition-opacity ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}>
-          <div className="bg-cyan-500/20 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap">
-            点击切换串/并行
+        {/* Hover tooltip for click action (only for non-first gaps) */}
+        {!isDropTarget && !dragSource && !isFirstGap && (
+          <div className={`absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 transition-opacity ${
+            isHovered ? 'opacity-100' : 'opacity-0'
+          }`}>
+            <div className="bg-cyan-500/20 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap">
+              点击切换串/并行
+            </div>
           </div>
-        </div>
-        <div className={`absolute left-1/2 -translate-x-1/2 -bottom-1 transition-opacity ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}>
-          <ArrowDown className="w-3 h-3 text-cyan-400" />
-        </div>
+        )}
+        {/* Drop tooltip for serial insert */}
+        {isDropTarget && (
+          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+            <div className="bg-cyan-500/30 text-cyan-400 text-[9px] px-2 py-0.5 rounded whitespace-nowrap font-medium">
+              {isFirstGap ? '插入开头' : '插入此处'}（串行）
+            </div>
+          </div>
+        )}
+        {!isDropTarget && !isFirstGap && (
+          <div className={`absolute left-1/2 -translate-x-1/2 -bottom-1 transition-opacity ${
+            isHovered && !dragSource ? 'opacity-100' : 'opacity-0'
+          }`}>
+            <ArrowDown className="w-3 h-3 text-cyan-400" />
+          </div>
+        )}
       </div>
     );
   }
@@ -224,6 +257,9 @@ export function PipelinePreview({
 
         {/* Steps with batch visualization */}
         <div className="w-full space-y-1">
+          {/* Gap before first step (for inserting at beginning) */}
+          {phase.steps.length > 0 && renderBatchGap(phase.phaseKey, -1)}
+
           {batches.map((batch, batchIdx) => {
             const isParallel = batch.isParallel;
             const batchStartIdx = globalStepIndex;
@@ -250,8 +286,8 @@ export function PipelinePreview({
                   </div>
                 </div>
 
-                {/* Gap between batches (serial separator) */}
-                {renderBatchGap(phase.phaseKey, batchStartIdx + batch.steps.length - 1, batchIdx === batches.length - 1)}
+                {/* Gap between batches (serial separator) - always render */}
+                {renderBatchGap(phase.phaseKey, batchStartIdx + batch.steps.length - 1)}
               </React.Fragment>
             );
           })}
