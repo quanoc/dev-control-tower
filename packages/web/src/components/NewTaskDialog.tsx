@@ -82,8 +82,8 @@ export function NewTaskDialog({ templates, onClose, onSuccess }: NewTaskDialogPr
                   className={`
                     flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
                     ${selectedTemplate === template.id
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-800 hover:border-gray-700'
+                      ? 'border-blue-500 bg-blue-500/10 dark:bg-blue-500/10'
+                      : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
                     }
                   `}
                 >
@@ -98,7 +98,7 @@ export function NewTaskDialog({ templates, onClose, onSuccess }: NewTaskDialogPr
                     w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0
                     ${selectedTemplate === template.id
                       ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-600'
+                      : 'border-gray-400 dark:border-gray-600'
                     }
                   `}>
                     {selectedTemplate === template.id && (
@@ -106,8 +106,8 @@ export function NewTaskDialog({ templates, onClose, onSuccess }: NewTaskDialogPr
                     )}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-200">{template.name}</div>
-                    <div className="text-xs text-gray-500">{template.description}</div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{template.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-500">{template.description}</div>
                   </div>
                 </label>
               ))}

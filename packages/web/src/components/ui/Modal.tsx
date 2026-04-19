@@ -34,7 +34,7 @@ export function Modal({
 
   const isFull = size === 'full';
   const containerBase =
-    'relative bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden';
+    'relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden';
   const containerClasses = isFull
     ? `${containerBase} ${sizeClasses.full}`
     : `${containerBase} w-full mx-auto ${sizeClasses[size]}`;
@@ -43,7 +43,7 @@ export function Modal({
     <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -58,18 +58,18 @@ export function Modal({
       >
         {/* Header */}
         {(title || !isFull) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
             <div>
               {title && (
                 <h2
                   id="modal-title"
-                  className="text-lg font-semibold text-gray-100"
+                  className="text-lg font-semibold text-gray-900 dark:text-gray-100"
                 >
                   {title}
                 </h2>
               )}
               {description && (
-                <p id="modal-desc" className="text-sm text-gray-500 mt-0.5">
+                <p id="modal-desc" className="text-sm text-gray-500 dark:text-gray-500 mt-0.5">
                   {description}
                 </p>
               )}
@@ -92,7 +92,7 @@ export function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-800 shrink-0">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0">
             {footer}
           </div>
         )}

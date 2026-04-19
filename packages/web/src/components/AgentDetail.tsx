@@ -29,32 +29,32 @@ export function AgentDetail({ agent, onClose }: AgentDetailProps) {
   };
 
   return (
-    <div className="mx-6 mb-4 border border-gray-800 bg-gray-900/80 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+    <div className="mx-6 mb-4 border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{agent.emoji}</span>
           <div>
-            <h3 className="text-lg font-semibold text-gray-100">{agent.name}</h3>
-            <p className="text-sm text-gray-500">{agent.role}</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{agent.name}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-500">{agent.role}</p>
           </div>
           <StatusBadge status={agent.status} size="md" />
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-          <X className="w-5 h-5 text-gray-400" />
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </button>
       </div>
 
       <div className="px-6 py-4 space-y-4">
         {/* Description */}
         <div>
-          <h4 className="text-sm font-medium text-gray-400 mb-1">能力特点</h4>
-          <pre className="text-sm text-gray-300 whitespace-pre-wrap font-sans">{agent.description}</pre>
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">能力特点</h4>
+          <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">{agent.description}</pre>
         </div>
 
         {/* Skills */}
         {agent.skills.length > 0 && (
           <div>
-            <h4 className="text-sm font-medium text-gray-400 mb-2">Skills</h4>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">Skills</h4>
             <div className="flex flex-wrap gap-2">
               {agent.skills.map(skill => (
                 <span
@@ -62,8 +62,8 @@ export function AgentDetail({ agent, onClose }: AgentDetailProps) {
                   className={`
                     inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
                     ${skill.enabled
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-gray-800 text-gray-500 border border-gray-700'
+                      ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-gray-200 dark:border-gray-700'
                     }
                   `}
                 >
@@ -77,14 +77,14 @@ export function AgentDetail({ agent, onClose }: AgentDetailProps) {
         {/* Current task */}
         {agent.currentTaskId && (
           <div>
-            <h4 className="text-sm font-medium text-gray-400 mb-1">当前任务</h4>
-            <p className="text-sm text-amber-400">正在处理任务 #{agent.currentTaskId}</p>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">当前任务</h4>
+            <p className="text-sm text-amber-600 dark:text-amber-400">正在处理任务 #{agent.currentTaskId}</p>
           </div>
         )}
 
         {/* Command input */}
         <div>
-          <h4 className="text-sm font-medium text-gray-400 mb-2">发送指令</h4>
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">发送指令</h4>
           <div className="flex gap-2">
             <input
               type="text"
@@ -92,19 +92,19 @@ export function AgentDetail({ agent, onClose }: AgentDetailProps) {
               onChange={e => setCommand(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
               placeholder="输入指令..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+              className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={handleSend}
               disabled={sending || !command.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 rounded-lg text-sm font-medium text-white transition-colors flex items-center gap-1.5"
             >
               <Send className="w-4 h-4" />
               发送
             </button>
           </div>
           {response && (
-            <div className="mt-3 p-3 bg-gray-800 rounded-lg text-sm text-gray-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
+            <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
               {response}
             </div>
           )}

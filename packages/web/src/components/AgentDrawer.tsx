@@ -14,26 +14,26 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 z-drawer"
+        className="fixed inset-0 bg-black/20 dark:bg-black/40 z-drawer"
         onClick={onClose}
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-[360px] bg-gray-900 border-l border-gray-800 z-modal flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 bottom-0 w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 z-modal flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{agent.emoji}</span>
             <div>
-              <h3 className="text-sm font-semibold text-gray-100">{agent.name}</h3>
-              <p className="text-xs text-gray-500">{agent.role}</p>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{agent.name}</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-500">{agent.role}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <X className="w-4 h-4 text-gray-400" />
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -42,13 +42,13 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
           <div className="px-5 py-4 space-y-5">
             {/* Source */}
             <div>
-              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">来源</h4>
+              <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-2">来源</h4>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium ${
                 agent.source === 'openclaw'
-                  ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                  ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20'
                   : agent.source === 'claude'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                  : 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
               }`}>
                 {agent.source === 'openclaw' && <span>🦀</span>}
                 {agent.source === 'claude' && <span>✨</span>}
@@ -61,11 +61,11 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
             {agent.skills && agent.skills.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Skills</h4>
+                  <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider">Skills</h4>
                   {agent.skills.some(s => !s.enabled) && (
                     <button
                       onClick={() => setShowDisabledSkills(!showDisabledSkills)}
-                      className="text-xs text-gray-500 hover:text-gray-400"
+                      className="text-xs text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400"
                     >
                       {showDisabledSkills ? '隐藏未启用' : '显示未启用'}
                     </button>
@@ -78,8 +78,8 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
                       className={`
                         inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
                         ${skill.enabled
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-gray-800 text-gray-500 border border-gray-700'
+                          ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-gray-200 dark:border-gray-700'
                         }
                       `}
                     >
@@ -96,8 +96,8 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
             {/* Workspace info */}
             {agent.workspace && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">工作目录</h4>
-                <p className="text-xs text-gray-500 font-mono truncate">{agent.workspace}</p>
+                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-1">工作目录</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-500 font-mono truncate">{agent.workspace}</p>
               </div>
             )}
           </div>
@@ -164,9 +164,9 @@ function AgentDefinitions({ agentId }: AgentDefinitionsProps) {
   if (loading) {
     return (
       <div>
-        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Agent 定义</h4>
-        <div className="flex items-center gap-2 text-xs text-gray-600 py-4">
-          <div className="w-3 h-3 border border-gray-600 border-t-transparent rounded-full animate-spin" />
+        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-2">Agent 定义</h4>
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-600 py-4">
+          <div className="w-3 h-3 border border-gray-400 dark:border-gray-600 border-t-transparent rounded-full animate-spin" />
           加载中...
         </div>
       </div>
@@ -179,19 +179,19 @@ function AgentDefinitions({ agentId }: AgentDefinitionsProps) {
 
   return (
     <div>
-      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Agent 定义</h4>
+      <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-2">Agent 定义</h4>
       <div className="space-y-2">
         {Object.entries(definitions).map(([key, content]) => (
-          <div key={key} className="border border-gray-800 rounded-lg overflow-hidden">
+          <div key={key} className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
             <button
               onClick={() => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
-              className="w-full flex items-center justify-between px-3 py-2 bg-gray-800/50 hover:bg-gray-800 text-left"
+              className="w-full flex items-center justify-between px-3 py-2 bg-gray-100/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
             >
-              <span className="text-xs font-medium text-gray-300">{FILE_LABELS[key] || key}</span>
-              <span className="text-xs text-gray-500">{expanded[key] ? '▼' : '▶'}</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{FILE_LABELS[key] || key}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-500">{expanded[key] ? '▼' : '▶'}</span>
             </button>
             {expanded[key] && (
-              <pre className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-gray-900">
+              <pre className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-gray-50 dark:bg-gray-900">
                 {content}
               </pre>
             )}

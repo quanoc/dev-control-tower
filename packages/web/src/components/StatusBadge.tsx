@@ -1,10 +1,10 @@
 import type { AgentStatus } from '@pipeline/shared';
 
 const STATUS_CONFIG: Record<AgentStatus, { color: string; label: string }> = {
-  idle:    { color: 'bg-emerald-400', label: '空闲' },
-  busy:    { color: 'bg-amber-400', label: '忙碌' },
-  error:   { color: 'bg-red-400',     label: '错误' },
-  offline: { color: 'bg-gray-500',    label: '离线' },
+  idle:    { color: 'bg-emerald-500', label: '空闲' },
+  busy:    { color: 'bg-amber-500', label: '忙碌' },
+  error:   { color: 'bg-red-500',     label: '错误' },
+  offline: { color: 'bg-gray-400',    label: '离线' },
 };
 
 interface StatusBadgeProps {
@@ -25,7 +25,7 @@ export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
           <span className={`absolute inset-0 rounded-full ${config.color} animate-ping opacity-75`} />
         )}
       </span>
-      <span className="text-gray-400">{config.label}</span>
+      <span className="text-gray-600 dark:text-gray-400">{config.label}</span>
     </span>
   );
 }

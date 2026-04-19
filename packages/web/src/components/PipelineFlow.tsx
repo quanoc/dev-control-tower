@@ -12,11 +12,11 @@ interface PipelineFlowProps {
 }
 
 const PHASE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  requirements: { bg: 'bg-purple-500/20', border: 'border-purple-500/40', text: 'text-purple-400' },
-  design: { bg: 'bg-cyan-500/20', border: 'border-cyan-500/40', text: 'text-cyan-400' },
-  development: { bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', text: 'text-emerald-400' },
-  testing: { bg: 'bg-amber-500/20', border: 'border-amber-500/40', text: 'text-amber-400' },
-  deployment: { bg: 'bg-blue-500/20', border: 'border-blue-500/40', text: 'text-blue-400' },
+  requirements: { bg: 'bg-purple-100 dark:bg-purple-500/20', border: 'border-purple-300 dark:border-purple-500/40', text: 'text-purple-600 dark:text-purple-400' },
+  design: { bg: 'bg-cyan-100 dark:bg-cyan-500/20', border: 'border-cyan-300 dark:border-cyan-500/40', text: 'text-cyan-600 dark:text-cyan-400' },
+  development: { bg: 'bg-emerald-100 dark:bg-emerald-500/20', border: 'border-emerald-300 dark:border-emerald-500/40', text: 'text-emerald-600 dark:text-emerald-400' },
+  testing: { bg: 'bg-amber-100 dark:bg-amber-500/20', border: 'border-amber-300 dark:border-amber-500/40', text: 'text-amber-600 dark:text-amber-400' },
+  deployment: { bg: 'bg-blue-100 dark:bg-blue-500/20', border: 'border-blue-300 dark:border-blue-500/40', text: 'text-blue-600 dark:text-blue-400' },
 };
 
 function getPhaseColor(phaseKey: string) {
@@ -32,38 +32,38 @@ function getStatusIcon(status: string, label: string) {
   switch (status) {
     case 'completed':
       return (
-        <div className="w-6 h-6 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center" title={`${label}: 已完成`}>
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center" title={`${label}: 已完成`}>
+          <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
         </div>
       );
     case 'running':
       return (
-        <div className="w-6 h-6 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center" title={`${label}: 进行中`}>
-          <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center" title={`${label}: 进行中`}>
+          <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin" />
         </div>
       );
     case 'failed':
       return (
-        <div className="w-6 h-6 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center" title={`${label}: 失败`}>
-          <XCircle className="w-3.5 h-3.5 text-red-400" />
+        <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-500/20 border-2 border-red-500 flex items-center justify-center" title={`${label}: 失败`}>
+          <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
         </div>
       );
     case 'waiting_approval':
       return (
-        <div className="w-6 h-6 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center animate-pulse" title={`${label}: 等待审批`}>
-          <Clock className="w-3.5 h-3.5 text-amber-400" />
+        <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center animate-pulse" title={`${label}: 等待审批`}>
+          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
         </div>
       );
     case 'skipped':
       return (
-        <div className="w-6 h-6 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center" title={`${label}: 跳过`}>
+        <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center" title={`${label}: 跳过`}>
           <PauseCircle className="w-3.5 h-3.5 text-gray-500" />
         </div>
       );
     default:
       return (
-        <div className="w-6 h-6 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center" title={`${label}: 待执行`}>
-          <Circle className="w-3.5 h-3.5 text-gray-600" />
+        <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center" title={`${label}: 待执行`}>
+          <Circle className="w-3.5 h-3.5 text-gray-400 dark:text-gray-600" />
         </div>
       );
   }
@@ -168,21 +168,21 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
                       <div
                         key={step.key}
                         className={`flex items-center gap-1.5 px-2 py-1 rounded border ${
-                          status === 'running' ? 'bg-blue-500/20 border-blue-500/50' :
-                          status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/50' :
-                          status === 'failed' ? 'bg-red-500/20 border-red-500/50' :
-                          status === 'waiting_approval' ? 'bg-amber-500/20 border-amber-500/50 animate-pulse' :
-                          'bg-gray-800 border-gray-700'
+                          status === 'running' ? 'bg-blue-100 dark:bg-blue-500/20 border-blue-300 dark:border-blue-500/50' :
+                          status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/50' :
+                          status === 'failed' ? 'bg-red-100 dark:bg-red-500/20 border-red-300 dark:border-red-500/50' :
+                          status === 'waiting_approval' ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/50 animate-pulse' :
+                          'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                         }`}
                         title={`${label}: ${status}`}
                       >
                         {getStatusIcon(status, label)}
                         <span className={`text-xs whitespace-nowrap ${
-                          status === 'running' ? 'text-blue-400 font-medium' :
-                          status === 'completed' ? 'text-emerald-400' :
-                          status === 'failed' ? 'text-red-400' :
-                          status === 'waiting_approval' ? 'text-amber-400 font-medium' :
-                          'text-gray-400'
+                          status === 'running' ? 'text-blue-600 dark:text-blue-400 font-medium' :
+                          status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
+                          status === 'failed' ? 'text-red-600 dark:text-red-400' :
+                          status === 'waiting_approval' ? 'text-amber-600 dark:text-amber-400 font-medium' :
+                          'text-gray-500 dark:text-gray-400'
                         }`}>
                           {label}
                         </span>

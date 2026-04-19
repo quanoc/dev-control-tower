@@ -51,10 +51,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  idle:    'text-emerald-500',
-  busy:    'text-amber-500',
-  error:   'text-red-500',
-  offline: 'text-gray-600',
+  idle:    'text-emerald-600 dark:text-emerald-500',
+  busy:    'text-amber-600 dark:text-amber-500',
+  error:   'text-red-600 dark:text-red-500',
+  offline: 'text-gray-400 dark:text-gray-600',
 };
 
 interface GroupedAgents {
@@ -114,8 +114,8 @@ function AgentButton({ agent, selectedId, onSelect }: AgentButtonProps) {
         flex items-center gap-3 px-4 py-1.5 rounded-lg
         border transition-all duration-150 cursor-pointer flex-shrink-0
         ${isSelected
-          ? 'border-blue-500/50 bg-blue-500/10'
-          : 'border-gray-800 hover:border-gray-700 hover:bg-gray-900/50'
+          ? 'border-blue-500/50 bg-blue-500/10 dark:border-blue-500/50 dark:bg-blue-500/10'
+          : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50'
         }
       `}
     >
@@ -126,19 +126,19 @@ function AgentButton({ agent, selectedId, onSelect }: AgentButtonProps) {
       <div className="flex flex-col items-start">
         {/* Row 1: name + role type */}
         <div className="flex items-baseline gap-1">
-          <span className={`text-sm font-medium leading-none ${isSelected ? 'text-blue-300' : 'text-gray-200'}`}>
+          <span className={`text-sm font-medium leading-none ${isSelected ? 'text-blue-600 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>
             {agent.name}
           </span>
           {roleType && (
-            <span className={`text-[10px] font-mono leading-none ${isSelected ? 'text-blue-400' : 'text-gray-500'}`}>
+            <span className={`text-[10px] font-mono leading-none ${isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
               {roleType}
             </span>
           )}
         </div>
         {/* Row 2: role label + status */}
-        <span className="text-[11px] text-gray-500 leading-none flex items-center gap-1.5 mt-1">
+        <span className="text-[11px] text-gray-500 dark:text-gray-500 leading-none flex items-center gap-1.5 mt-1">
           <span>{roleLabel}</span>
-          <span className="text-gray-700">·</span>
+          <span className="text-gray-300 dark:text-gray-700">·</span>
           <span className={statusColor}>{statusLabel}</span>
         </span>
       </div>
@@ -242,7 +242,7 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
         {hiddenClaudeCount > 0 && !showAllClaude && (
           <button
             onClick={() => setShowAllClaude(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-500 dark:text-gray-400 text-sm"
           >
             <ChevronDown className="w-3.5 h-3.5" />
             +{hiddenClaudeCount}
@@ -253,7 +253,7 @@ export function AgentBar({ agents, selectedId, onSelect }: AgentBarProps) {
         {showAllClaude && grouped.claude.length > CLAUDE_SHOWN_LIMIT && (
           <button
             onClick={() => setShowAllClaude(false)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-400 text-sm"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all duration-150 cursor-pointer flex-shrink-0 text-gray-500 dark:text-gray-400 text-sm"
           >
             <ChevronUp className="w-3.5 h-3.5" />
             收起

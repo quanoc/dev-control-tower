@@ -10,12 +10,12 @@ import { useTaskStore } from '../store/tasks';
 type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'cyan' | 'purple' | 'orange' | 'amber';
 
 const TASK_STATUS_CONFIG: Record<string, { label: string; variant: BadgeVariant; color: string }> = {
-  pending:    { label: '待启动', variant: 'default', color: 'text-gray-400' },
-  running:    { label: '进行中', variant: 'primary', color: 'text-blue-400' },
-  completed:  { label: '已完成', variant: 'success', color: 'text-emerald-400' },
-  failed:     { label: '失败',   variant: 'danger',  color: 'text-red-400' },
-  cancelled:  { label: '已取消', variant: 'default', color: 'text-gray-600' },
-  paused:     { label: '已暂停', variant: 'warning', color: 'text-amber-400' },
+  pending:    { label: '待启动', variant: 'default', color: 'text-gray-500 dark:text-gray-400' },
+  running:    { label: '进行中', variant: 'primary', color: 'text-blue-600 dark:text-blue-400' },
+  completed:  { label: '已完成', variant: 'success', color: 'text-emerald-600 dark:text-emerald-400' },
+  failed:     { label: '失败',   variant: 'danger',  color: 'text-red-600 dark:text-red-400' },
+  cancelled:  { label: '已取消', variant: 'default', color: 'text-gray-400 dark:text-gray-600' },
+  paused:     { label: '已暂停', variant: 'warning', color: 'text-amber-600 dark:text-amber-400' },
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -94,7 +94,7 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
       <div className="p-6 space-y-6">
         {/* Pipeline flow visual */}
         <div>
-          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">流程总览</h4>
+          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3">流程总览</h4>
           <div className="flex items-center gap-2">
             <PipelineFlow
               stageRuns={pipeline.stageRuns}
@@ -106,18 +106,18 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
 
         {/* Stage detail table */}
         <div>
-          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
-          <div className="overflow-x-auto rounded-lg border border-gray-800">
+          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
             <table className="w-full text-xs whitespace-nowrap">
               <thead>
-                <tr className="bg-gray-900 border-b border-gray-800">
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-8">#</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-16">阶段</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium">步骤</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">执行者</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">状态</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-20">耗时</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 font-medium w-48">输出</th>
+                <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-8">#</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-16">阶段</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium">步骤</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">执行者</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">状态</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">耗时</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-48">输出</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,30 +147,30 @@ function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRu
   }
 
   return (
-    <tr className="border-b border-gray-800/50 hover:bg-gray-800/30">
-      <td className="px-3 py-2.5 text-gray-600 font-mono">{index + 1}</td>
-      <td className="px-3 py-2.5 text-gray-400">{phaseLabel}</td>
-      <td className="px-3 py-2.5 text-gray-300">{stepLabel}</td>
-      <td className="px-3 py-2.5 text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
+    <tr className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
+      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-600 font-mono">{index + 1}</td>
+      <td className="px-3 py-2.5 text-gray-600 dark:text-gray-400">{phaseLabel}</td>
+      <td className="px-3 py-2.5 text-gray-800 dark:text-gray-300">{stepLabel}</td>
+      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
       <td className="px-3 py-2.5">
         <Badge variant={status.variant}>{status.label}</Badge>
       </td>
-      <td className="px-3 py-2.5 text-gray-500 font-mono">{duration}</td>
+      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 font-mono">{duration}</td>
       <td className="px-3 py-2.5">
         {stage.status === 'waiting_approval' && onApprove ? (
           <button
             onClick={() => onApprove(stage.id)}
-            className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+            className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-300 font-medium"
           >
             通过
           </button>
         ) : stage.status === 'failed' ? (
           <div className="flex items-center gap-2">
-            <span className="text-red-400 truncate max-w-[120px]" title={stage.error ?? undefined}>{stage.error?.substring(0, 40) ?? '未知错误'}...</span>
+            <span className="text-red-600 dark:text-red-400 truncate max-w-[120px]" title={stage.error ?? undefined}>{stage.error?.substring(0, 40) ?? '未知错误'}...</span>
             {onRetry && (
               <button
                 onClick={() => onRetry(stage.id)}
-                className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0 px-1.5 py-0.5 bg-blue-500/10 rounded"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 flex-shrink-0 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-500/10 rounded"
               >
                 重试
               </button>
@@ -178,16 +178,16 @@ function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRu
             {onSkip && (
               <button
                 onClick={() => onSkip(stage.id)}
-                className="text-xs text-gray-400 hover:text-gray-300 flex-shrink-0 px-1.5 py-0.5 bg-gray-700 rounded"
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 flex-shrink-0 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded"
               >
                 跳过
               </button>
             )}
           </div>
         ) : stage.output ? (
-          <span className="text-gray-400 truncate max-w-[180px]" title={stage.output}>{stage.output.substring(0, 50)}...</span>
+          <span className="text-gray-600 dark:text-gray-400 truncate max-w-[180px]" title={stage.output}>{stage.output.substring(0, 50)}...</span>
         ) : (
-          <span className="text-gray-700">—</span>
+          <span className="text-gray-300 dark:text-gray-700">—</span>
         )}
       </td>
     </tr>
@@ -234,17 +234,17 @@ function TaskRow({ task }: TaskRowProps) {
 
   return (
     <>
-      <tr className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
+      <tr className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50/20 dark:hover:bg-gray-800/20 transition-colors">
         {/* ID */}
-        <td className="px-4 py-3 text-gray-500 font-mono text-xs w-16">#{task.id}</td>
+        <td className="px-4 py-3 text-gray-400 dark:text-gray-500 font-mono text-xs w-16">#{task.id}</td>
 
         {/* Title + Description */}
         <td className="px-4 py-3 min-w-0">
-          <div className="text-sm text-gray-200 font-medium truncate" title={task.title}>
+          <div className="text-sm text-gray-800 dark:text-gray-200 font-medium truncate" title={task.title}>
             {task.title}
           </div>
           {task.description && (
-            <div className="text-xs text-gray-500 truncate mt-0.5" title={task.description}>
+            <div className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5" title={task.description}>
               {task.description}
             </div>
           )}
@@ -258,20 +258,20 @@ function TaskRow({ task }: TaskRowProps) {
         {/* Pipeline Template */}
         <td className="px-4 py-3 w-32">
           {pipeline?.templateName ? (
-            <span className="text-xs text-blue-400">{pipeline.templateName}</span>
+            <span className="text-xs text-blue-600 dark:text-blue-400">{pipeline.templateName}</span>
           ) : (
-            <span className="text-xs text-gray-600">—</span>
+            <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
           )}
         </td>
 
         {/* Current Stage */}
         <td className="px-4 py-3 w-40">
           <div className="flex flex-col gap-0.5">
-            <span className={`text-xs ${currentStage.blocked ? 'text-amber-400 font-medium' : 'text-gray-300'}`}>
+            <span className={`text-xs ${currentStage.blocked ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
               {currentStage.label}
             </span>
             {currentStage.reason && (
-              <span className="text-[10px] text-gray-500 truncate" title={currentStage.reason}>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 truncate" title={currentStage.reason}>
                 {currentStage.reason}
               </span>
             )}
@@ -282,13 +282,13 @@ function TaskRow({ task }: TaskRowProps) {
                   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                   return (
                     <>
-                      <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${currentStage.blocked ? 'bg-amber-500' : 'bg-blue-500'}`}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-gray-500 font-mono">{currentStage.progress}</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-500 font-mono">{currentStage.progress}</span>
                     </>
                   );
                 })()}
@@ -299,7 +299,7 @@ function TaskRow({ task }: TaskRowProps) {
 
         {/* Created */}
         <td className="px-4 py-3 w-40">
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-gray-500 dark:text-gray-600">
             {new Date(task.createdAt).toLocaleDateString('zh-CN')}
           </span>
         </td>
@@ -343,7 +343,7 @@ function TaskRow({ task }: TaskRowProps) {
               size="sm"
               onClick={() => setShowPipeline(true)}
               disabled={!pipeline}
-              className={!pipeline ? 'text-gray-600 cursor-not-allowed' : ''}
+              className={!pipeline ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed' : ''}
               aria-label={pipeline ? "查看流水线" : "需要先启动流水线"}
               title={pipeline ? "查看流水线" : "需要先启动流水线"}
             >
@@ -375,7 +375,7 @@ export function TaskList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+        <Loader2 className="w-5 h-5 text-gray-400 dark:text-gray-600 animate-spin" />
       </div>
     );
   }
@@ -383,28 +383,28 @@ export function TaskList() {
   if (tasks.length === 0) {
     return (
       <div className="text-center py-20">
-        <GitBranch className="w-8 h-8 text-gray-700 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">暂无需求，点击上方「新建需求」创建</p>
+        <GitBranch className="w-8 h-8 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-500">暂无需求，点击上方「新建需求」创建</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-800">
+    <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-gray-900/80 border-b border-gray-800">
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-16">#</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500">需求</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-28">状态</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-32">流水线</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-36">当前阶段 / 进度</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-40">创建时间</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500">操作</th>
+            <tr className="bg-gray-50/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800">
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500 w-16">#</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500">需求</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500 w-28">状态</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500 w-32">流水线</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500 w-36">当前阶段 / 进度</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500 w-40">创建时间</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-500">操作</th>
             </tr>
           </thead>
-          <tbody className="bg-gray-950">
+          <tbody>
             {tasks.map(task => (
               <TaskRow key={task.id} task={task} />
             ))}
