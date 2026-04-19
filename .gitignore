@@ -2,3 +2,5 @@ node_modules
 dist
 *.db-journal
 .claude/
+*.DS_Store
+.DS_Store

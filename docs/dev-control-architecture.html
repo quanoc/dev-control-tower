@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>dev-control-tower · 项目架构图</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #f0f2f5;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  min-height: 100vh;
+  padding: 0px 14px 0px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #1a1f2e;
+}
+
+/* ── Page header ── */
+.page-header { text-align: center; margin-bottom: 12px; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.4px; }
+.page-header .sub { font-size: 13px; color: #6b7280; margin-top: 5px; }
+.page-header .meta {
+  margin-top: 10px;
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.meta-tag {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* ── Canvas ── */
+.canvas { width: 100%; max-width: 1040px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Cards ── */
+.card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
+  padding: 10px 14px 10px;
+}
+.card-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.card-title { font-size: 13px; font-weight: 600; }
+.card-sub { font-size: 11px; color: #9ca3af; margin-left: auto; }
+.badge {
+  font-size: 10.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Chip grids ── */
+.chip-grid { display: grid; gap: 8px; }
+.g2 { grid-template-columns: repeat(2,1fr); }
+.g3 { grid-template-columns: repeat(3,1fr); }
+.g4 { grid-template-columns: repeat(4,1fr); }
+.g5 { grid-template-columns: repeat(5,1fr); }
+.g6 { grid-template-columns: repeat(6,1fr); }
+
+.chip {
+  border-radius: 10px; padding: 11px 9px 10px;
+  text-align: center; border: 1px solid transparent;
+}
+.chip-icon  { font-size: 17px; display: block; margin-bottom: 5px; line-height:1; }
+.chip-name  { font-size: 11px; font-weight: 600; display: block; margin-bottom: 2px; }
+.chip-cn    { font-size: 9.5px; display: block; margin-bottom: 5px; }
+.chip-hr    { height: 1px; margin: 0 4px 5px; }
+.chip-tags  { font-size: 8.5px; color: #9ca3af; line-height: 1.65; }
+
+/* ── Layout ── */
+.layout { display: flex; gap: 12px; align-items: flex-start; }
+.layout-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0px; }
+.layout-side { width: 194px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Side panel ── */
+.side-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  padding: 10px;
+}
+.side-header {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 0px; padding-bottom: 4px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.side-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink:0; }
+.side-title { font-size: 11.5px; font-weight: 600; }
+.side-sub { font-size: 9.5px; color: #9ca3af; margin-left: auto; }
+.side-item {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 3px 0; border-bottom: 1px solid #f9fafb;
+}
+.side-item:last-child { border: none; }
+.side-dot2 { width: 4px; height: 4px; border-radius: 50%; margin-top: 5px; flex-shrink:0; }
+.side-text { font-size: 10.5px; color: #6b7280; line-height: 1.4; }
+.side-code { font-size: 9px; color: #9ca3af; font-family: monospace; }
+
+/* ── Arrow ── */
+.arrow-row {
+  display: flex; justify-content: center; align-items: center;
+  gap: 6px; height: 18px; margin: -2px 0;
+}
+.arrow-label { font-size: 10px; color: #c5c9d0; font-weight: 500; }
+
+/* ── Executor section ── */
+.exec-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.exec-bot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.exec-chip {
+  border-radius: 10px; padding: 12px 11px;
+  border: 1.5px solid transparent;
+}
+.exec-role {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 7px; border-radius: 8px;
+  display: inline-block; margin-bottom: 7px;
+}
+.exec-title { font-size: 12.5px; font-weight: 700; margin-bottom: 3px; }
+.exec-en { font-size: 9.5px; margin-bottom: 7px; }
+.exec-hr { height: 1px; margin: 0 0 6px; }
+.exec-tags { font-size: 8.5px; color: #9ca3af; line-height: 1.65; }
+.core-badge {
+  font-size: 8.5px; font-weight: 700; color: #9333ea;
+  background: #f3e8ff; padding: 1px 5px; border-radius: 6px; margin-left: 4px;
+}
+
+/* ── Data flow row ── */
+.flow-row {
+  display: flex; align-items: center; gap: 0;
+  background: #fff; border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.flow-step {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; text-align: center;
+}
+.flow-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-bottom: 6px;
+}
+.flow-name { font-size: 10.5px; font-weight: 600; margin-bottom: 2px; }
+.flow-sub  { font-size: 9px; color: #9ca3af; }
+.flow-arrow {
+  flex-shrink: 0; padding: 0 6px;
+  color: #d1d5db; font-size: 14px;
+}
+.flow-arrow-label {
+  font-size: 8.5px; color: #d1d5db; text-align: center;
+  white-space: nowrap;
+}
+
+/* ── DB schema section ── */
+.schema-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.schema-table {
+  border-radius: 9px; padding: 10px;
+  border: 1px solid transparent;
+}
+.schema-name { font-size: 10.5px; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
+.schema-desc { font-size: 9.5px; color: #6b7280; margin-bottom: 6px; }
+.schema-hr { height: 1px; margin: 0 0 5px; }
+.schema-field { font-size: 8.5px; color: #9ca3af; line-height: 1.7; font-family: monospace; }
+
+/* ── Status pill ── */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 20px;
+}
+
+/* ── Color tokens ── */
+/* Blue */
+.b-blue { border-color: #bfdbfe !important; }
+.bg-blue { background: #eff6ff; }
+.badge-blue { background: #eff6ff; color: #2563eb; }
+.chip-blue { background: #f0f7ff; border-color: #bfdbfe; }
+.chip-blue .chip-name { color: #1d4ed8; }
+.chip-blue .chip-cn   { color: #60a5fa; }
+.chip-blue .chip-hr   { background: #dbeafe; }
+/* Teal */
+.b-teal { border-color: #99f6e4 !important; }
+.bg-teal { background: #f0fdf9; }
+.badge-teal { background: #f0fdf9; color: #0d9488; }
+.chip-teal { background: #f0fdf8; border-color: #a7f3d0; }
+.chip-teal .chip-name { color: #065f46; }
+.chip-teal .chip-cn   { color: #34d399; }
+.chip-teal .chip-hr   { background: #d1fae5; }
+/* Amber */
+.b-amber { border-color: #fcd34d !important; }
+.badge-amber { background: #fffbeb; color: #d97706; }
+.chip-amber { background: #fffdf0; border-color: #fde68a; }
+.chip-amber .chip-name { color: #92400e; }
+.chip-amber .chip-cn   { color: #f59e0b; }
+.chip-amber .chip-hr   { background: #fef3c7; }
+/* Rose */
+.b-rose { border-color: #fca5a5 !important; }
+.badge-rose { background: #fff1f2; color: #e11d48; }
+.exec-router { background: #fff5f7; border-color: #fda4af; }
+.exec-router .exec-role  { background: #ffe4e6; color: #be123c; }
+.exec-router .exec-title { color: #9f1239; }
+.exec-router .exec-en    { color: #f43f5e; }
+.exec-router .exec-hr    { background: #ffe4e6; }
+/* Homer */
+.exec-homer { background: #f5f3ff; border-color: #c4b5fd; }
+.exec-homer .exec-role  { background: #ede9fe; color: #6d28d9; }
+.exec-homer .exec-title { color: #6d28d9; }
+.exec-homer .exec-en    { color: #8b5cf6; }
+.exec-homer .exec-hr    { background: #ede9fe; }
+/* Agent core */
+.exec-agent {
+  background: linear-gradient(135deg,#fdf4ff,#fce7f3);
+  border-color: #e879f9 !important; border-width: 2px !important;
+  box-shadow: 0 0 0 3px rgba(232,121,249,.12), 0 4px 14px rgba(217,70,239,.1);
+}
+.exec-agent .exec-role  { background: #f3e8ff; color: #7c3aed; }
+.exec-agent .exec-title { color: #7c3aed; }
+.exec-agent .exec-en    { color: #a855f7; }
+.exec-agent .exec-hr    { background: #f3e8ff; }
+/* System */
+.exec-system { background: #fff7ed; border-color: #fdba74; }
+.exec-system .exec-role  { background: #ffedd5; color: #c2410c; }
+.exec-system .exec-title { color: #c2410c; }
+.exec-system .exec-en    { color: #ea580c; }
+.exec-system .exec-hr    { background: #ffedd5; }
+
+/* Side colors */
+.side-pkg   { border-color: #bfdbfe; }
+.side-pkg .side-dot  { background: #3b82f6; }
+.side-pkg .side-dot2 { background: #93c5fd; }
+.side-pkg .side-title { color: #1d4ed8; }
+
+.side-eng   { border-color: #99f6e4; }
+.side-eng .side-dot  { background: #0d9488; }
+.side-eng .side-dot2 { background: #5eead4; }
+.side-eng .side-title { color: #0f766e; }
+
+.side-route { border-color: #fde68a; }
+.side-route .side-dot  { background: #d97706; }
+.side-route .side-dot2 { background: #fcd34d; }
+.side-route .side-title { color: #92400e; }
+
+/* DB table colors */
+.t-blue   { background: #f0f7ff; border-color: #bfdbfe; }
+.t-blue .schema-name { color: #1d4ed8; }
+.t-blue .schema-hr { background: #dbeafe; }
+
+.t-teal   { background: #f0fdf8; border-color: #a7f3d0; }
+.t-teal .schema-name { color: #065f46; }
+.t-teal .schema-hr { background: #d1fae5; }
+
+.t-amber  { background: #fffdf0; border-color: #fde68a; }
+.t-amber .schema-name { color: #92400e; }
+.t-amber .schema-hr { background: #fef3c7; }
+
+/* State machine pills */
+.sm-grid { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sm-state {
+  font-size: 10px; font-weight: 600; font-family: monospace;
+  padding: 4px 10px; border-radius: 6px;
+}
+.sm-arrow-label { font-size: 9px; color: #9ca3af; }
+.sm-arrow-icon { font-size: 14px; color: #d1d5db; }
+
+/* Footer */
+.footer { margin-top: 10px; font-size: 10.5px; color: #c0c4cc; text-align: center; }
+.footer span { margin: 0 6px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>dev-control-tower · 项目架构图</h1>
+  <p class="sub">AI 研发控制台 · TypeScript + React + Express + SQLite · Monorepo</p>
+  <div class="meta">
+    <span class="meta-tag" style="background:#f0fdf9;color:#0d9488">pnpm workspaces</span>
+    <span class="meta-tag" style="background:#eff6ff;color:#2563eb">TypeScript 5.7</span>
+    <span class="meta-tag" style="background:#fff7ed;color:#d97706">MVP → 可落地</span>
+    <span class="meta-tag" style="background:#fff1f2;color:#e11d48">⚠ 生产就绪度待完善</span>
+  </div>
+</div>
+
+<div class="canvas">
+
+  <!-- ── 0. 数据流总览 ── -->
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:16px">🗺</span>
+      <span class="card-title">整体数据流 · End-to-End Flow</span>
+    </div>
+    <div class="flow-row">
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#eff6ff">🖥</div>
+        <div class="flow-name" style="color:#1d4ed8">Web UI</div>
+        <div class="flow-sub">React / Zustand</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 4px">
+        <div class="flow-arrow">→</div>
+        <div class="flow-arrow-label">HTTP / WS</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#f0fdf9">🔀</div>
+        <div class="flow-name" style="color:#0d9488">API Routers</div>
+        <div class="flow-sub">Express REST</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 4px">
+        <div class="flow-arrow">→</div>
+        <div class="flow-arrow-label">query / write</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#fffbeb">🗃</div>
+        <div class="flow-name" style="color:#d97706">SQLite DB</div>
+        <div class="flow-sub">better-sqlite3</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 4px">
+        <div class="flow-arrow">→</div>
+        <div class="flow-arrow-label">驱动执行</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#fff5f7">⚙️</div>
+        <div class="flow-name" style="color:#be123c">Pipeline Engine</div>
+        <div class="flow-sub">Executor + StateMachine</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 4px">
+        <div class="flow-arrow">→</div>
+        <div class="flow-arrow-label">调用</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#f5f3ff">🤖</div>
+        <div class="flow-name" style="color:#6d28d9">Executors</div>
+        <div class="flow-sub">Agent / Human / System</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 4px">
+        <div class="flow-arrow">→</div>
+        <div class="flow-arrow-label">结果 / 状态</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-icon" style="background:#f0fdf9">🔄</div>
+        <div class="flow-name" style="color:#0d9488">OpenClaw / Claude</div>
+        <div class="flow-sub">External Agents</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Main layout ── -->
+  <div class="layout">
+    <div class="layout-main">
+
+      <!-- ── 1. Frontend ── -->
+      <div class="card b-blue">
+        <div class="card-header">
+          <span style="font-size:15px">🖥</span>
+          <span class="badge badge-blue">packages/web &nbsp;前端层</span>
+          <span class="card-sub">React 19 · Vite 6 · Tailwind 3 · Zustand 5</span>
+        </div>
+        <div class="chip-grid g6">
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">📋</span>
+            <span class="chip-name">TasksPage</span>
+            <span class="chip-cn">任务管理</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">TaskList.tsx<br>416行<br>增删查改</div>
+          </div>
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">🤖</span>
+            <span class="chip-name">AgentsPage</span>
+            <span class="chip-cn">Agent管理</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">AgentLibrary<br>556行<br>配置同步</div>
+          </div>
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">⚙️</span>
+            <span class="chip-name">PipelinesPage</span>
+            <span class="chip-cn">流水线</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">PipelineManager<br>905行 ⚠<br>编排编辑</div>
+          </div>
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">🧩</span>
+            <span class="chip-name">ComponentsPage</span>
+            <span class="chip-cn">组件页</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">组件预览<br>调试用<br>UI Kit</div>
+          </div>
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">📦</span>
+            <span class="chip-name">Store</span>
+            <span class="chip-cn">Zustand状态</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">agents.ts<br>tasks.ts<br>全局状态</div>
+          </div>
+
+          <div class="chip chip-blue">
+            <span class="chip-icon">⇌</span>
+            <span class="chip-name">API Client</span>
+            <span class="chip-cn">接口层</span>
+            <div class="chip-hr"></div>
+            <div class="chip-tags">client.ts<br>fetch封装<br>类型安全</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="arrow-row">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3.5 8l3.5 4 3.5-4" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="arrow-label">REST API · WebSocket</span>
+      </div>
+
+      <!-- ── 2. Backend ── -->
+      <div class="card b-teal">
+        <div class="card-header" style="margin-bottom:10px">
+          <span style="font-size:15px">🗄</span>
+          <span class="badge badge-teal">packages/server &nbsp;后端层</span>
+          <span class="card-sub">Express 4 · better-sqlite3 · ws</span>
+        </div>
+
+        <!-- Two-column: routes | db -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+
+          <!-- routes -->
+          <div style="background:#f0fdf8;border:1px solid #a7f3d0;border-radius:9px;padding:9px 11px;">
+            <div style="font-size:9.5px;font-weight:700;color:#0d9488;letter-spacing:0.05em;margin-bottom:7px;">🔀 routes/ &nbsp;HTTP 协议层</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:78px;">agents.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">GET · POST /api/agents &nbsp;·&nbsp; 同步 · 配置</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:78px;">tasks.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">GET · POST /api/tasks &nbsp;·&nbsp; start · approve · retry</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:78px;">pipelines.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">GET /templates &nbsp;·&nbsp; POST /components</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- db -->
+          <div style="background:#f0fdf8;border:1px solid #a7f3d0;border-radius:9px;padding:9px 11px;">
+            <div style="font-size:9.5px;font-weight:700;color:#0d9488;letter-spacing:0.05em;margin-bottom:7px;">🗃 db/ &nbsp;数据层</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:90px;">queries.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">全量 CRUD · 事务 · 630行</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:90px;">index.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">SQLite 初始化 · Schema 迁移</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span style="font-size:9.5px;font-weight:600;color:#065f46;font-family:monospace;min-width:90px;">agent-sync.ts</span>
+                <span style="font-size:9px;color:#9ca3af;">OpenClaw 拉取 · 注册表 · 心跳</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Schema strip: single row, 6 tables -->
+        <div style="background:#f0fdf8;border:1px solid #d1fae5;border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:9px;font-weight:700;color:#0d9488;white-space:nowrap;margin-right:2px;">schema.sql</span>
+          <span style="font-size:8.5px;color:#9ca3af;">·</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#065f46;background:#fff;border:1px solid #a7f3d0;border-radius:5px;padding:2px 7px;">agents</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#065f46;background:#fff;border:1px solid #a7f3d0;border-radius:5px;padding:2px 7px;">tasks</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#92400e;background:#fff;border:1px solid #fde68a;border-radius:5px;padding:2px 7px;">pipeline_templates</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#92400e;background:#fff;border:1px solid #fde68a;border-radius:5px;padding:2px 7px;">pipeline_instances</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#065f46;background:#fff;border:1px solid #a7f3d0;border-radius:5px;padding:2px 7px;">pipeline_stage_runs</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#065f46;background:#fff;border:1px solid #a7f3d0;border-radius:5px;padding:2px 7px;">state_transition_log</span>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="arrow-row">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3.5 8l3.5 4 3.5-4" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="arrow-label">调度 · 驱动执行</span>
+      </div>
+
+
+      <!-- ── 3. Engine ── -->
+      <div class="card b-amber">
+        <div class="card-header" style="margin-bottom:10px">
+          <span style="font-size:15px">⚙️</span>
+          <span class="badge badge-amber">engine/ &nbsp;核心引擎</span>
+          <span class="card-sub">Pipeline Executor · StateMachine · Scheduler</span>
+        </div>
+
+        <div style="background:#fffdf0;border:1px solid #fde68a;border-radius:9px;padding:9px 11px;margin-bottom:8px;">
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <span style="font-size:9.5px;font-weight:600;color:#92400e;font-family:monospace;min-width:110px;">executor.ts</span>
+              <span style="font-size:9px;color:#9ca3af;">399行 &nbsp;·&nbsp; Phase 分批调度 &nbsp;·&nbsp; 步骤串/并行 &nbsp;·&nbsp; Human Gate 检测</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <span style="font-size:9.5px;font-weight:600;color:#92400e;font-family:monospace;min-width:110px;">statemachine.ts</span>
+              <span style="font-size:9px;color:#9ca3af;">116行 &nbsp;·&nbsp; 合法状态校验 &nbsp;·&nbsp; 转换日志记录 &nbsp;·&nbsp; 审计追溯</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <span style="font-size:9.5px;font-weight:600;color:#92400e;font-family:monospace;min-width:110px;">scheduler.ts</span>
+              <span style="font-size:9px;color:#9ca3af;">143行 &nbsp;·&nbsp; Cron 定时 &nbsp;·&nbsp; 触发/延迟 &nbsp;·&nbsp; 重启恢复</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- State machine: one-line strip -->
+        <div style="background:#fffdf0;border:1px solid #fef3c7;border-radius:8px;padding:7px 11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:9px;font-weight:700;color:#d97706;white-space:nowrap;">状态流转</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:5px;">pending</span>
+          <span style="color:#d1d5db;font-size:12px;">→</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:5px;">running</span>
+          <span style="color:#d1d5db;font-size:12px;">→</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:5px;">completed</span>
+          <span style="color:#fcd34d;font-size:11px;margin:0 2px;">|</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:5px;">running</span>
+          <span style="color:#d1d5db;font-size:12px;">→</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#ffe4e6;color:#be123c;padding:2px 7px;border-radius:5px;">failed</span>
+          <span style="color:#d1d5db;font-size:12px;">→</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:5px;">pending</span>
+          <span style="font-size:8.5px;color:#9ca3af;">(retry)</span>
+          <span style="color:#fcd34d;font-size:11px;margin:0 2px;">|</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#fef9c3;color:#a16207;padding:2px 7px;border-radius:5px;">paused</span>
+          <span style="font-size:8.5px;color:#9ca3af;">(human gate)</span>
+          <span style="color:#d1d5db;font-size:12px;">→</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:5px;">running</span>
+        </div>
+      </div>
+
+
+      <!-- Arrow -->
+      <div class="arrow-row">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3.5 8l3.5 4 3.5-4" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="arrow-label">ExecutorFactory.getExecutor(actorType)</span>
+      </div>
+
+      <!-- ── 4. Executors ── -->
+      <div class="card b-rose">
+        <div class="card-header" style="margin-bottom:10px">
+          <span style="font-size:15px">🤖</span>
+          <span class="badge badge-rose">executors/ &nbsp;执行器层</span>
+          <span class="card-sub">三角色模型 · Agent-Centric</span>
+        </div>
+
+        <!-- factory + interface: one-line strip -->
+        <div style="background:#fff5f7;border:1px solid #fda4af;border-radius:8px;padding:7px 11px;display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <span style="font-size:9px;font-weight:700;color:#be123c;">基础设施</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#9f1239;">factory.ts</span>
+          <span style="font-size:8.5px;color:#9ca3af;">getExecutor('agent' | 'human' | 'system') · 执行器分发</span>
+          <span style="color:#fca5a5;margin:0 2px;">·</span>
+          <span style="font-size:9px;font-family:monospace;font-weight:600;color:#9f1239;">interface.ts</span>
+          <span style="font-size:8.5px;color:#9ca3af;">execute(context) → Result · 统一契约 · 错误边界</span>
+        </div>
+
+        <!-- Three executors: compact chips -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+
+          <div class="exec-chip exec-homer" style="padding:10px 11px;">
+            <div class="exec-role" style="margin-bottom:5px;">Human Role · 人</div>
+            <div class="exec-title" style="font-size:11px;margin-bottom:5px;">human-executor.ts</div>
+            <div class="exec-hr"></div>
+            <div class="exec-tags">暂停等待人工审批<br>approve / reject · 超时</div>
+          </div>
+
+          <div class="exec-chip exec-agent" style="padding:10px 11px;">
+            <div class="exec-role" style="margin-bottom:5px;">Agent Role · 核心 <span class="core-badge">★</span></div>
+            <div class="exec-title" style="font-size:11px;margin-bottom:5px;">agent-executor.ts</div>
+            <div class="exec-hr"></div>
+            <div class="exec-tags">OpenClaw / Claude 调用<br>Skills 路由 · artifact 存储</div>
+          </div>
+
+          <div class="exec-chip exec-system" style="padding:10px 11px;">
+            <div class="exec-role" style="margin-bottom:5px;">System Role · 系统</div>
+            <div class="exec-title" style="font-size:11px;margin-bottom:5px;">system-executor.ts</div>
+            <div class="exec-hr"></div>
+            <div class="exec-tags">shell · API · file ops<br>动作注册 &nbsp;⚠ 多为 TODO</div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /layout-main -->
+
+    <!-- ── Side panels ── -->
+    <div class="layout-side">
+
+      <!-- packages/shared -->
+      <div class="side-panel side-pkg">
+        <div class="side-header">
+          <div class="side-dot"></div>
+          <span class="side-title">packages/shared</span>
+          <span class="side-sub">共享类型</span>
+        </div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">Task · TaskStatus</span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">Agent · AgentSource</span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">PipelinePhase / Step</span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">ExecutorResult</span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">StateTransition</span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">ApiResponse 泛型</span></div>
+      </div>
+
+      <!-- openclaw/ -->
+      <div class="side-panel side-eng">
+        <div class="side-header">
+          <div class="side-dot"></div>
+          <span class="side-title">openclaw/</span>
+          <span class="side-sub">外部集成</span>
+        </div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">agent.ts&nbsp; · <span class="side-code">OpenClaw CLI</span></span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">claude-agent.ts&nbsp; · <span class="side-code">Claude API</span></span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text">skills.ts&nbsp; · <span class="side-code">Skills 路由管理</span></span></div>
+        <div style="margin-top:8px;padding:6px 8px;background:#f0fdf9;border-radius:7px;font-size:9px;color:#0d9488;font-weight:500;">
+          Custom Agent 接入预留<br>统一 Adapter 抽象
+        </div>
+      </div>
+
+      <!-- Pipeline DSL -->
+      <div class="side-panel side-route">
+        <div class="side-header">
+          <div class="side-dot"></div>
+          <span class="side-title">Pipeline DSL</span>
+          <span class="side-sub">两层结构</span>
+        </div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text"><b>Phase</b> (L1)<br><span class="side-code">requirements · design · dev<br>testing · deployment</span></span></div>
+        <div class="side-item"><div class="side-dot2"></div><span class="side-text"><b>Step</b> (L2)<br><span class="side-code">actorType · action · batches</span></span></div>
+        <div style="margin-top:8px;padding:6px 8px;background:#fffbeb;border-radius:7px;font-size:9px;color:#d97706;font-weight:500;">
+          幂等执行 · 重启恢复 · 事件驱动自动化
+        </div>
+      </div>
+
+      <!-- 生产就绪评估 -->
+      <div class="side-panel" style="border-color:#fca5a5">
+        <div class="side-header">
+          <div class="side-dot" style="background:#ef4444"></div>
+          <span class="side-title" style="color:#b91c1c">生产就绪度</span>
+        </div>
+        <div class="side-item"><div class="side-dot2" style="background:#ef4444"></div><span class="side-text">❌ Agent 调用 Mock</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#ef4444"></div><span class="side-text">❌ 无认证鉴权</span></div>
+<!--         <div class="side-item"><div class="side-dot2" style="background:#ef4444"></div><span class="side-text">❌ 测试覆盖 &lt;10%</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#ef4444"></div><span class="side-text">❌ 无日志监控</span></div> -->
+        <div class="side-item"><div class="side-dot2" style="background:#f59e0b"></div><span class="side-text">⚠ 单线程执行</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#f59e0b"></div><span class="side-text">⚠ SQLite 并发限制</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#22c55e"></div><span class="side-text">✅ 架构设计清晰</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#22c55e"></div><span class="side-text">✅ 状态机严谨</span></div>
+        <div class="side-item"><div class="side-dot2" style="background:#22c55e"></div><span class="side-text">✅ 类型全覆盖</span></div>
+        <div style="margin-top:9px;padding:7px 9px;background:#fff1f2;border-radius:8px;font-size:9.5px;color:#be123c;font-weight:600;text-align:center;line-height:1.6;">
+          综合评级: B+<br>
+          <span style="font-weight:400;color:#f43f5e">架构A- · 功能C+ · 生产C</span>
+        </div>
+      </div>
+
+    </div><!-- /layout-side -->
+  </div><!-- /layout -->
+
+</div><!-- /canvas -->
+
+<div class="footer">
+  <span>dev-control-tower</span>·
+  <span>TypeScript + React + Express + SQLite</span>·
+  <span>Monorepo (pnpm workspaces)</span>·
+  <span>2026-04-20</span>
+</div>
+
+</body>
+</html>
