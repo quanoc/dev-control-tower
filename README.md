@@ -39,7 +39,9 @@
     └───────────┘    └───────────┘    └─────────────┘
 ```
 
-**Architecture Diagram:** [View Interactive Diagram](./docs/dev-control-t-architecture.html) | [PNG Version](./docs/architecture-diagram.png)
+**Architecture Diagram:** [View Interactive Diagram](./docs/dev-control-architecture.html) | [PNG Version](./docs/dev-control-architecture.png)
+
+![Architecture](./docs/dev-control-architecture.png)
 
 The system follows a layered architecture:
 - **Frontend**: React + Vite + Tailwind + Zustand for state management
