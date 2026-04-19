@@ -9,7 +9,7 @@ interface ModalProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'wide' | 'full';
 }
 
 const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
@@ -17,6 +17,7 @@ const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  wide: 'w-[80vw] max-w-[1200px]',
   full: 'inset-4 md:inset-8 flex flex-col',
 };
 
@@ -85,7 +86,7 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className={isFull ? 'flex-1 overflow-y-auto' : 'overflow-y-auto max-h-[70vh]'}>
+        <div className={isFull ? 'flex-1 overflow-y-auto max-h-[calc(100vh-180px)]' : 'overflow-y-auto max-h-[70vh]'}>
           {children}
         </div>
 

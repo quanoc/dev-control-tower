@@ -688,7 +688,7 @@ export function PipelineManager() {
       <Modal
         open={showForm}
         onClose={handleCloseForm}
-        size="full"
+        size="wide"
         title={editingId ? '编辑流水线模板' : '新建流水线模板'}
         footer={
           <>
