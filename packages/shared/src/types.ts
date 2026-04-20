@@ -58,6 +58,33 @@ export interface SkillEntry {
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+/**
+ * 任务级别的共享上下文
+ * 在流水线执行过程中持续更新，供所有步骤共享
+ */
+export interface RuntimeContext {
+  /** 当前任务进度摘要 */
+  summary: string;
+  /** 当前阶段 */
+  currentPhase?: string;
+  /** 累积的关键决策 */
+  keyDecisions: Array<{
+    from: string;      // 来自哪个 step
+    decision: string;
+    reason?: string;
+  }>;
+  /** 累积的约束条件 */
+  constraints: string[];
+  /** 累积的产物 */
+  artifacts: Artifact[];
+  /** 风险提示 */
+  risks?: string[];
+  /** 最后更新的 step */
+  lastUpdatedBy?: string;
+  /** 最后更新时间 */
+  lastUpdatedAt?: string;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -298,6 +325,8 @@ export interface PipelineInstance {
   templatePhases?: PipelinePhase[];
   status: PipelineInstanceStatus;
   currentStageIndex: number;
+  /** 流水线实例的共享上下文 */
+  runtimeContext?: RuntimeContext;
   stageRuns: StageRun[];
   createdAt: string;
   completedAt: string | null;

@@ -15,6 +15,7 @@ import type {
   StateTransitionLog,
   Artifact,
   StructuredOutput,
+  RuntimeContext,
 } from '@pipeline/shared';
 import { flattenPhases, groupStagesIntoPhases } from '@pipeline/shared';
 
@@ -464,6 +465,76 @@ export function setStageRunStructuredOutput(id: number, structuredOutput: Struct
   ).run(JSON.stringify(structuredOutput), output ?? null, id);
 }
 
+// ─── Runtime Context Queries ────────────────────────────────────
+
+/**
+ * 获取流水线实例的共享上下文
+ */
+export function getRuntimeContext(instanceId: number): RuntimeContext | null {
+  const db = getDb();
+  const row = db.prepare('SELECT runtime_context FROM pipeline_instances WHERE id = ?').get(instanceId) as any;
+  if (!row || !row.runtime_context) return null;
+
+  try {
+    return JSON.parse(row.runtime_context);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 更新流水线实例的共享上下文
+ */
+export function updateRuntimeContext(instanceId: number, context: RuntimeContext): void {
+  const db = getDb();
+  db.prepare(
+    'UPDATE pipeline_instances SET runtime_context = ? WHERE id = ?'
+  ).run(JSON.stringify(context), instanceId);
+}
+
+/**
+ * 合并更新共享上下文（增量更新）
+ */
+export function mergeRuntimeContext(
+  instanceId: number,
+  updates: Partial<RuntimeContext>,
+  updatedBy: string
+): RuntimeContext {
+  const current = getRuntimeContext(instanceId) || {
+    summary: '',
+    keyDecisions: [],
+    constraints: [],
+    artifacts: [],
+  };
+
+  const merged: RuntimeContext = {
+    ...current,
+    ...updates,
+    lastUpdatedBy: updatedBy,
+    lastUpdatedAt: new Date().toISOString(),
+  };
+
+  // 如果有新的 artifacts，合并而不是替换
+  if (updates.artifacts) {
+    const existingUrls = new Set(current.artifacts?.map(a => a.url) || []);
+    const newArtifacts = updates.artifacts.filter(a => !existingUrls.has(a.url));
+    merged.artifacts = [...(current.artifacts || []), ...newArtifacts];
+  }
+
+  // 如果有新的 keyDecisions，合并
+  if (updates.keyDecisions) {
+    merged.keyDecisions = [...(current.keyDecisions || []), ...updates.keyDecisions];
+  }
+
+  // 如果有新的 constraints，合并
+  if (updates.constraints) {
+    merged.constraints = [...new Set([...(current.constraints || []), ...updates.constraints])];
+  }
+
+  updateRuntimeContext(instanceId, merged);
+  return merged;
+}
+
 // ─── State Transition Log Queries ──────────────────────────────
 
 export function logStateTransition(
@@ -522,12 +593,22 @@ function rowToAgent(row: any): Agent {
 }
 
 function rowToTask(row: any, pipeline?: PipelineInstance | undefined): Task {
+  let runtimeContext: RuntimeContext | undefined;
+  try {
+    if (row.runtime_context && row.runtime_context !== '{}') {
+      runtimeContext = JSON.parse(row.runtime_context);
+    }
+  } catch {
+    runtimeContext = undefined;
+  }
+
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     createdBy: row.created_by,
     status: row.status,
+    runtimeContext,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -606,6 +687,16 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     };
   });
 
+  // Parse runtime_context
+  let runtimeContext: RuntimeContext | undefined;
+  try {
+    if (row.runtime_context && row.runtime_context !== '{}') {
+      runtimeContext = JSON.parse(row.runtime_context);
+    }
+  } catch {
+    runtimeContext = undefined;
+  }
+
   return {
     id: row.id,
     taskId: row.task_id,
@@ -614,6 +705,7 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
     templatePhases,
     status: row.status,
     currentStageIndex: row.current_stage_index,
+    runtimeContext,
     stageRuns: enrichedStageRuns,
     createdAt: row.created_at,
     completedAt: row.completed_at,

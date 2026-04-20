@@ -5,6 +5,7 @@
  */
 
 import type { Artifact } from '../executors/interface';
+import type { RuntimeContext } from '@pipeline/shared';
 
 /**
  * Information passed to the next step.
@@ -44,7 +45,7 @@ export interface StepOutput {
 
 /**
  * Context for executing a step.
- * Contains task info and previous step's output.
+ * Contains task info, shared context, and previous step's output.
  */
 export interface StepContext {
   /** Task information */
@@ -64,7 +65,10 @@ export interface StepContext {
     nextStepHint?: string;
   };
 
-  /** Previous step's output (if any) */
+  /** 任务级别的共享上下文（优先使用） */
+  runtimeContext?: RuntimeContext;
+
+  /** Previous step's output (保留用于追溯) */
   previousOutput?: StepOutput;
 
   /** Pipeline info */

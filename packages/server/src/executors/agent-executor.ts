@@ -8,12 +8,13 @@ import type { Agent } from '@pipeline/shared';
 /**
  * Agent 执行器
  *
- * 简化的上下文传递流程：
- * 1. ContextBuilder 获取上一步输出
- * 2. PromptGenerator 生成 Prompt（包含 goal 和 expectedOutput）
+ * 上下文传递流程：
+ * 1. ContextBuilder 获取任务的 runtimeContext + 上一步输出
+ * 2. PromptGenerator 生成 Prompt
  * 3. Agent 执行，返回 JSON 输出
  * 4. OutputParser 解析 JSON
- * 5. 保存到数据库
+ * 5. 保存到 Step 的 structured_output
+ * 6. 更新任务的 runtimeContext（共享上下文）
  */
 export class AgentExecutor implements StageExecutor {
   readonly type = 'agent' as const;
@@ -51,7 +52,7 @@ export class AgentExecutor implements StageExecutor {
     const prompt = this.promptGenerator.generate(stepContext, agent);
 
     console.log(`[AgentExecutor] Calling ${agent.source || 'openclaw'} agent "${agent.id}" for action "${action}"`);
-    console.log(`[AgentExecutor] Previous output: ${stepContext.previousOutput ? 'yes' : 'no'}`);
+    console.log(`[AgentExecutor] Runtime context: ${stepContext.runtimeContext ? 'yes' : 'no'}`);
 
     // 执行
     const source = agent.source || 'openclaw';
@@ -70,12 +71,21 @@ export class AgentExecutor implements StageExecutor {
       const parsed = this.outputParser.parse(result.output);
 
       if (parsed.output) {
-        // 保存结构化输出
+        // 1. 保存结构化输出到 Step
         queries.setStageRunStructuredOutput(
           stageRunId,
           parsed.output,
           result.output
         );
+
+        // 2. 更新流水线实例的共享上下文
+        if (instanceId) {
+          this.updateRuntimeContext(
+            instanceId,
+            stageKey || action,
+            parsed.output
+          );
+        }
 
         // 合并 artifacts
         if (parsed.output.artifacts.length > 0) {
@@ -88,26 +98,59 @@ export class AgentExecutor implements StageExecutor {
   }
 
   /**
+   * 更新流水线实例的共享上下文
+   */
+  private updateRuntimeContext(
+    instanceId: number,
+    stageKey: string,
+    output: { artifacts: Artifact[]; nextStepInput: { summary: string; keyPoints?: string[]; decisions?: Array<{ decision: string; reason?: string }> } }
+  ): void {
+    // 构建 keyDecisions
+    const keyDecisions = (output.nextStepInput.decisions || []).map(d => ({
+      from: stageKey,
+      decision: d.decision,
+      reason: d.reason,
+    }));
+
+    // 使用 mergeRuntimeContext 增量更新
+    queries.mergeRuntimeContext(instanceId, {
+      summary: output.nextStepInput.summary,
+      keyDecisions,
+      artifacts: output.artifacts,
+      constraints: output.nextStepInput.keyPoints || [],
+    }, stageKey);
+
+    console.log(`[AgentExecutor] Updated runtime context for instance ${instanceId}`);
+  }
+
+  /**
    * 模拟执行
    */
   private async executeMock(context: ExecutionContext): Promise<ExecutionResult> {
-    const { agentId, action, componentId } = context;
+    const { agentId, action, componentId, instanceId, stageKey } = context;
 
     await this.delay(2000 + Math.random() * 3000);
 
     const success = Math.random() < 0.8;
 
     if (success) {
+      const mockOutput = {
+        artifacts: this.getMockArtifacts(action),
+        nextStepInput: {
+          summary: `[Mock] ${action} completed successfully`,
+          keyPoints: ['Mock key point 1', 'Mock key point 2'],
+        }
+      };
+
+      // 更新共享上下文
+      if (instanceId) {
+        this.updateRuntimeContext(instanceId, stageKey || action, mockOutput);
+      }
+
       return {
         success: true,
-        output: JSON.stringify({
-          artifacts: this.getMockArtifacts(action),
-          nextStepInput: {
-            summary: `[Mock] ${action} completed successfully`,
-            keyPoints: ['Mock key point 1', 'Mock key point 2'],
-          }
-        }),
-        artifacts: this.getMockArtifacts(action),
+        output: JSON.stringify(mockOutput),
+        artifacts: mockOutput.artifacts,
         metadata: { componentId, action, executionTime: Date.now() }
       };
     }

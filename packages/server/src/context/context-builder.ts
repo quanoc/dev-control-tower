@@ -2,7 +2,7 @@
  * Context Builder - Simplified
  *
  * Builds StepContext for executing a step.
- * Gets the previous step's output directly, no complex dependency rules.
+ * Reads shared runtime context from task, plus previous step's output.
  */
 
 import * as queries from '../db/queries.js';
@@ -41,10 +41,13 @@ export class ContextBuilder {
     // 4. Get stage definition from template
     const stageDef = this.getStageDefinition(instance, stageKey);
 
-    // 5. Get previous stage's output
+    // 5. Get instance's runtime context (共享上下文)
+    const runtimeContext = queries.getRuntimeContext(instanceId) ?? undefined;
+
+    // 6. Get previous stage's output (保留用于追溯)
     const previousOutput = this.getPreviousOutput(instance, stageKey);
 
-    // 6. Calculate progress
+    // 7. Calculate progress
     const currentIndex = instance.stageRuns?.findIndex((sr: any) => sr.stageKey === stageKey) ?? 0;
     const totalStages = instance.stageRuns?.length ?? 1;
     const progress = `${currentIndex + 1}/${totalStages}`;
@@ -63,6 +66,7 @@ export class ContextBuilder {
         expectedOutput: stageDef?.expectedOutput ?? [],
         nextStepHint: stageDef?.nextStepHint,
       },
+      runtimeContext,
       previousOutput,
       pipeline: {
         templateName: instance.templateName ?? '',

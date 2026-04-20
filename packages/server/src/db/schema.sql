@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS pipeline_instances (
     template_id INTEGER REFERENCES pipeline_templates(id),
     status TEXT DEFAULT 'pending',
     current_stage_index INTEGER DEFAULT 0,
+    runtime_context TEXT DEFAULT '{}',  -- 共享上下文（流水线执行过程中的关键信息）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME
 );

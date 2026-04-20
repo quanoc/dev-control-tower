@@ -1,12 +1,12 @@
 /**
  * Prompt Generator - Simplified
  *
- * Generates prompts based on step's goal, expectedOutput, and nextStepHint.
+ * Generates prompts based on step's goal, expectedOutput, and runtimeContext.
  * Requires agent to output JSON format.
  */
 
 import type { StepContext, StepOutput } from './types.js';
-import type { Agent } from '@pipeline/shared';
+import type { Agent, RuntimeContext } from '@pipeline/shared';
 
 /**
  * PromptGenerator generates prompts for agent execution.
@@ -27,15 +27,20 @@ export class PromptGenerator {
     // 2. Task info
     sections.push(this.buildTaskSection(context));
 
-    // 3. Previous step's output (if any)
+    // 3. Runtime context (任务级别的共享上下文，优先)
+    if (context.runtimeContext) {
+      sections.push(this.buildRuntimeContextSection(context.runtimeContext));
+    }
+
+    // 4. Previous step's output (保留用于追溯)
     if (context.previousOutput) {
       sections.push(this.buildPreviousOutputSection(context.previousOutput));
     }
 
-    // 4. Current step's goal and expected output
+    // 5. Current step's goal and expected output
     sections.push(this.buildGoalSection(context));
 
-    // 5. Output format requirement
+    // 6. Output format requirement
     sections.push(this.buildOutputFormatSection(context));
 
     return sections.join('\n\n---\n\n');
@@ -62,6 +67,55 @@ ${agent.description ? `\n${agent.description}` : ''}`;
 **Description**: ${context.task.description || 'No description provided'}
 
 **Pipeline**: ${context.pipeline.templateName} (Progress: ${context.pipeline.progress})`;
+  }
+
+  /**
+   * Build runtime context section (任务级别的共享上下文).
+   */
+  private buildRuntimeContextSection(ctx: RuntimeContext): string {
+    let section = `## Task Context (Shared)
+
+This is the accumulated context from previous steps:
+
+### Summary
+${ctx.summary}
+
+`;
+
+    if (ctx.keyDecisions?.length) {
+      section += `### Key Decisions\n`;
+      for (const d of ctx.keyDecisions) {
+        section += `- **${d.decision}** (from ${d.from})`;
+        if (d.reason) section += ` - ${d.reason}`;
+        section += '\n';
+      }
+      section += '\n';
+    }
+
+    if (ctx.constraints?.length) {
+      section += `### Constraints\n`;
+      for (const c of ctx.constraints) {
+        section += `- ${c}\n`;
+      }
+      section += '\n';
+    }
+
+    if (ctx.artifacts?.length) {
+      section += `### Accumulated Artifacts\n`;
+      for (const a of ctx.artifacts) {
+        section += `- [${a.title || a.type}](${a.url})\n`;
+      }
+      section += '\n';
+    }
+
+    if (ctx.risks?.length) {
+      section += `### Risks\n`;
+      for (const r of ctx.risks) {
+        section += `- ${r}\n`;
+      }
+    }
+
+    return section.trim();
   }
 
   /**

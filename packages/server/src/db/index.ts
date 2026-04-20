@@ -65,6 +65,16 @@ export function getDb(): Database.Database {
       );
     }
 
+    // Migrate pipeline_instances table
+    const instancesColumns = db.prepare(
+      "PRAGMA table_info(pipeline_instances)"
+    ).all() as any[];
+    if (!instancesColumns.some(c => c.name === 'runtime_context')) {
+      db.exec(
+        "ALTER TABLE pipeline_instances ADD COLUMN runtime_context TEXT DEFAULT '{}'"
+      );
+    }
+
     // Migrate agents table for multi-agent support
     const agentsColumns = db.prepare(
       "PRAGMA table_info(agents)"
