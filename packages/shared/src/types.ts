@@ -1,6 +1,26 @@
 // Shared type definitions for the AI Pipeline Dashboard
 // Two-level pipeline DSL: phases (level 1) → steps (level 2)
 
+// ─── Artifact Types ──────────────────────────────────────────────
+
+export type ArtifactType =
+  | 'document'      // 文档（需求文档、架构文档、API文档）
+  | 'pr'            // Pull Request 链接
+  | 'commit'        // Git commit 链接
+  | 'deploy'        // 部署链接
+  | 'test_report'   // 测试报告
+  | 'lint_report'   // Lint 报告
+  | 'security_report' // 安全扫描报告
+  | 'build_artifact'  // 构建产物
+  | 'other';        // 其他
+
+export interface Artifact {
+  type: ArtifactType;
+  url: string;
+  title?: string;
+  createdAt?: string;
+}
+
 // ─── Agent Types ───────────────────────────────────────────────
 
 export type AgentStatus = 'idle' | 'busy' | 'error' | 'offline';
@@ -293,10 +313,26 @@ export interface StageRun {
   status: StageRunStatus;
   input: string | null;
   output: string | null;
-  artifacts: string[];
+  structuredOutput: StructuredOutput | null;
+  artifacts: Artifact[];
   startedAt: string | null;
   completedAt: string | null;
   error: string | null;
+}
+
+// ─── Structured Output Types ─────────────────────────────────────
+
+export interface StructuredOutput {
+  summary: string;
+  keyPoints: string[];
+  decisions: Array<{
+    decision: string;
+    reason: string;
+    impact?: string;
+  }>;
+  risks?: string[];
+  artifacts: Artifact[];
+  rawOutputRef?: string;
 }
 
 // ─── State Transition Log ──────────────────────────────────────

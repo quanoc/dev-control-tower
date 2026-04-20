@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS pipeline_stage_runs (
     status TEXT DEFAULT 'pending',
     input TEXT,
     output TEXT,
+    structured_output TEXT DEFAULT '{}',  -- Structured output for context passing
     artifacts TEXT DEFAULT '[]',
     started_at DATETIME,
     completed_at DATETIME,

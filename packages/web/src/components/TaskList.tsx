@@ -1,4 +1,4 @@
-import type { Task, StageRun, PipelineInstance } from '@pipeline/shared';
+import type { Task, StageRun, PipelineInstance, Artifact, ArtifactType } from '@pipeline/shared';
 import { Play, Loader2, Eye, GitBranch } from 'lucide-react';
 import { useState } from 'react';
 import { PipelineFlow } from './PipelineFlow';
@@ -81,6 +81,33 @@ interface PipelineModalProps {
 }
 
 function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: PipelineModalProps) {
+  // 计算阶段分组和 rowspan
+  const phaseGroups: { phaseKey: string; label: string; startIndex: number; count: number }[] = [];
+  let currentPhase = '';
+  let currentCount = 0;
+  let startIndex = 0;
+
+  pipeline.stageRuns.forEach((stage, idx) => {
+    const phaseKey = stage.phaseKey || 'other';
+    const label = PHASE_LABELS[phaseKey] || phaseKey;
+
+    if (phaseKey !== currentPhase) {
+      if (currentCount > 0) {
+        phaseGroups.push({ phaseKey: currentPhase, label: PHASE_LABELS[currentPhase] || currentPhase, startIndex, count: currentCount });
+      }
+      currentPhase = phaseKey;
+      currentCount = 1;
+      startIndex = idx;
+    } else {
+      currentCount++;
+    }
+  });
+
+  // 添加最后一组
+  if (currentCount > 0) {
+    phaseGroups.push({ phaseKey: currentPhase, label: PHASE_LABELS[currentPhase] || currentPhase, startIndex, count: currentCount });
+  }
+
   return (
     <Modal
       open
@@ -112,18 +139,107 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-8">#</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-16">阶段</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium">步骤</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">执行者</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">阶段</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-28">步骤</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-24">执行者</th>
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">状态</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">耗时</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-48">输出</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-16">耗时</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium">输出</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-24">产物</th>
                 </tr>
               </thead>
               <tbody>
-                {pipeline.stageRuns.map((stage, i) => (
-                  <StageRow key={stage.id} stage={stage} index={i} onRetry={onRetry} onSkip={onSkip} onApprove={onApprove} />
-                ))}
+                {pipeline.stageRuns.map((stage, i) => {
+                  // 查找当前行是否是阶段的起始行
+                  const group = phaseGroups.find(g => g.startIndex === i);
+                  const status = STAGE_STATUS_MAP[stage.status] || STAGE_STATUS_MAP.pending;
+                  const stepLabel = stage.stepLabel || stage.stageKey;
+
+                  let duration = '—';
+                  if (stage.startedAt && stage.completedAt) {
+                    const ms = new Date(stage.completedAt).getTime() - new Date(stage.startedAt).getTime();
+                    duration = ms < 1000 ? `${ms}ms` : `${Math.round(ms / 1000)}s`;
+                  } else if (stage.startedAt) {
+                    duration = '运行中';
+                  }
+
+                  return (
+                    <tr key={stage.id} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
+                      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-600 font-mono">{i + 1}</td>
+
+                      {/* 阶段单元格 - 只在起始行渲染，合并 rowspan */}
+                      {group ? (
+                        <td
+                          rowSpan={group.count}
+                          className="px-3 py-2.5 text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-medium align-top"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <span>{group.label}</span>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal">
+                              {group.count} 步骤
+                            </span>
+                          </div>
+                        </td>
+                      ) : null}
+
+                      <td className="px-3 py-2.5 text-gray-800 dark:text-gray-300">{stepLabel}</td>
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono text-[10px]">{stage.agentId || '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono">{duration}</td>
+                      <td className="px-3 py-2.5">
+                        {stage.status === 'waiting_approval' && onApprove ? (
+                          <button
+                            onClick={() => onApprove(stage.id)}
+                            className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-300 font-medium"
+                          >
+                            通过
+                          </button>
+                        ) : stage.status === 'failed' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-red-600 dark:text-red-400 truncate max-w-[120px]" title={stage.error ?? undefined}>
+                              {stage.error?.substring(0, 30) ?? '错误'}...
+                            </span>
+                            {onRetry && (
+                              <button
+                                onClick={() => onRetry(stage.id)}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-500/10 rounded"
+                              >
+                                重试
+                              </button>
+                            )}
+                            {onSkip && (
+                              <button
+                                onClick={() => onSkip(stage.id)}
+                                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded"
+                              >
+                                跳过
+                              </button>
+                            )}
+                          </div>
+                        ) : stage.output ? (
+                          <span className="text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={stage.output}>
+                            {stage.output.substring(0, 40)}...
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 dark:text-gray-700">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {stage.artifacts && stage.artifacts.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {stage.artifacts.map((artifact, idx) => (
+                              <ArtifactLink key={idx} artifact={artifact} />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300 dark:text-gray-700">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -133,64 +249,56 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
   );
 }
 
-function StageRow({ stage, index, onRetry, onSkip, onApprove }: { stage: StageRun; index: number; onRetry?: (id: number) => void; onSkip?: (id: number) => void; onApprove?: (id: number) => void }) {
-  const status = STAGE_STATUS_MAP[stage.status] || STAGE_STATUS_MAP.pending;
-  const stepLabel = stage.stepLabel || stage.stageKey;
-  const phaseLabel = stage.phaseKey ? (PHASE_LABELS[stage.phaseKey] || stage.phaseKey) : '—';
+/**
+ * 产物类型图标映射
+ */
+const ARTIFACT_ICONS: Record<ArtifactType, string> = {
+  document: '📄',
+  pr: '🔀',
+  commit: '📝',
+  deploy: '🚀',
+  test_report: '🧪',
+  lint_report: '🔍',
+  security_report: '🔒',
+  build_artifact: '📦',
+  other: '📎',
+};
 
-  let duration = '—';
-  if (stage.startedAt && stage.completedAt) {
-    const ms = new Date(stage.completedAt).getTime() - new Date(stage.startedAt).getTime();
-    duration = ms < 1000 ? `${ms}ms` : `${Math.round(ms / 1000)}s`;
-  } else if (stage.startedAt) {
-    duration = '计算中...';
+/**
+ * 产物链接组件
+ */
+function ArtifactLink({ artifact }: { artifact: Artifact }) {
+  const icon = ARTIFACT_ICONS[artifact.type] || '📎';
+  const title = artifact.title || artifact.type;
+  const displayText = title.length > 15 ? title.substring(0, 15) + '...' : title;
+
+  // 判断是否是可点击链接
+  const isClickable = artifact.url.startsWith('http') || artifact.url.startsWith('file://');
+
+  if (isClickable) {
+    return (
+      <a
+        href={artifact.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate max-w-[120px] inline-flex items-center gap-1"
+        title={`${artifact.title || artifact.type}: ${artifact.url}`}
+      >
+        <span>{icon}</span>
+        <span>{displayText}</span>
+      </a>
+    );
   }
 
+  // mock:// 或其他不可点击的 URL
   return (
-    <tr className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
-      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-600 font-mono">{index + 1}</td>
-      <td className="px-3 py-2.5 text-gray-600 dark:text-gray-400">{phaseLabel}</td>
-      <td className="px-3 py-2.5 text-gray-800 dark:text-gray-300">{stepLabel}</td>
-      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 font-mono text-[10px]">{stage.agentId}</td>
-      <td className="px-3 py-2.5">
-        <Badge variant={status.variant}>{status.label}</Badge>
-      </td>
-      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 font-mono">{duration}</td>
-      <td className="px-3 py-2.5">
-        {stage.status === 'waiting_approval' && onApprove ? (
-          <button
-            onClick={() => onApprove(stage.id)}
-            className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-300 font-medium"
-          >
-            通过
-          </button>
-        ) : stage.status === 'failed' ? (
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 dark:text-red-400 truncate max-w-[120px]" title={stage.error ?? undefined}>{stage.error?.substring(0, 40) ?? '未知错误'}...</span>
-            {onRetry && (
-              <button
-                onClick={() => onRetry(stage.id)}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 flex-shrink-0 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-500/10 rounded"
-              >
-                重试
-              </button>
-            )}
-            {onSkip && (
-              <button
-                onClick={() => onSkip(stage.id)}
-                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 flex-shrink-0 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded"
-              >
-                跳过
-              </button>
-            )}
-          </div>
-        ) : stage.output ? (
-          <span className="text-gray-600 dark:text-gray-400 truncate max-w-[180px]" title={stage.output}>{stage.output.substring(0, 50)}...</span>
-        ) : (
-          <span className="text-gray-300 dark:text-gray-700">—</span>
-        )}
-      </td>
-    </tr>
+    <span
+      className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px] inline-flex items-center gap-1"
+      title={`${artifact.title || artifact.type}: ${artifact.url}`}
+    >
+      <span>{icon}</span>
+      <span>{displayText}</span>
+    </span>
   );
 }
 

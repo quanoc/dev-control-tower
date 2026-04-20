@@ -1,9 +1,12 @@
 import { stateMachine } from './statemachine.js';
 import * as queries from '../db/queries.js';
 import { ExecutorFactory } from '../executors/factory.js';
-import type { ExecutionContext, ExecutionResult } from '../executors/interface.js';
+import type { ExecutionContext, ExecutionResult, Artifact } from '../executors/interface.js';
 import type { PipelineStage, PipelineInstance, StageRun, Agent } from '@pipeline/shared';
 import { PHASES, flattenPhases } from '@pipeline/shared';
+
+// Mock 模式配置：可通过环境变量控制
+const MOCK_MODE = process.env.PIPELINE_MOCK_MODE !== 'false';
 
 /**
  * 流水线执行器
@@ -129,8 +132,8 @@ export class PipelineExecutor {
       // 获取对应的执行器
       const executor = ExecutorFactory.getExecutor(meta.actorType);
 
-      // 执行（mock 模式）
-      const result = await executor.execute(context, true);
+      // 执行（根据 MOCK_MODE 配置决定是否模拟）
+      const result = await executor.execute(context, MOCK_MODE);
 
       // 处理 Human 审批
       if (meta.actorType === 'human' && result.error === 'WAITING_APPROVAL') {
@@ -141,7 +144,7 @@ export class PipelineExecutor {
       }
 
       if (result.success) {
-        await this.handleStageSuccess(instanceId, stageRunId, result.output || '');
+        await this.handleStageSuccess(instanceId, stageRunId, result.output || '', result.artifacts || []);
       } else {
         await this.handleStageFailure(instanceId, stageRunId, result.error || 'Execution failed');
       }
@@ -155,16 +158,20 @@ export class PipelineExecutor {
   /**
    * 处理阶段执行成功
    */
-  private async handleStageSuccess(instanceId: number, stageRunId: number, output: string): Promise<void> {
-    // 先更新输出（不改变状态）
+  private async handleStageSuccess(instanceId: number, stageRunId: number, output: string, artifacts: Artifact[] = []): Promise<void> {
+    // 先更新输出和产物（不改变状态）
     const db = queries.getDb();
-    db.prepare('UPDATE pipeline_stage_runs SET output = ? WHERE id = ?').run(output, stageRunId);
+    db.prepare('UPDATE pipeline_stage_runs SET output = ?, artifacts = ? WHERE id = ?')
+      .run(output, JSON.stringify(artifacts), stageRunId);
 
     // 通过状态机转换状态
     await stateMachine.transition('stage', stageRunId, 'completed', 'system');
     queries.advancePipelineStage(instanceId);
 
-    console.log(`[Executor] Stage ${stageRunId} completed`);
+    const artifactSummary = artifacts.length > 0
+      ? artifacts.map(a => `${a.type}:${a.url}`).join(', ')
+      : 'none';
+    console.log(`[Executor] Stage ${stageRunId} completed with artifacts: ${artifactSummary}`);
 
     // 继续执行下一阶段
     await this.executeNextStage(instanceId);

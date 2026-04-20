@@ -13,6 +13,8 @@ import type {
   PipelineStage,
   StageRun,
   StateTransitionLog,
+  Artifact,
+  StructuredOutput,
 } from '@pipeline/shared';
 import { flattenPhases, groupStagesIntoPhases } from '@pipeline/shared';
 
@@ -455,6 +457,13 @@ export function setStageRunInput(id: number, input: string): void {
   ).run(input, id);
 }
 
+export function setStageRunStructuredOutput(id: number, structuredOutput: StructuredOutput, output?: string): void {
+  const db = getDb();
+  db.prepare(
+    'UPDATE pipeline_stage_runs SET structured_output = ?, output = COALESCE(?, output) WHERE id = ?'
+  ).run(JSON.stringify(structuredOutput), output ?? null, id);
+}
+
 // ─── State Transition Log Queries ──────────────────────────────
 
 export function logStateTransition(
@@ -612,6 +621,37 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
 }
 
 function rowToStageRun(row: any): StageRun {
+  // 解析 artifacts，支持新旧两种格式
+  let artifacts: Artifact[] = [];
+  try {
+    const parsed = JSON.parse(row.artifacts || '[]');
+    if (Array.isArray(parsed)) {
+      // 检查是否是新的结构化格式
+      if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].type) {
+        artifacts = parsed as Artifact[];
+      } else if (parsed.length > 0 && typeof parsed[0] === 'string') {
+        // 旧格式：string[]，转换为 Artifact[]
+        artifacts = parsed.map((url: string) => ({
+          type: 'other',
+          url,
+          createdAt: new Date().toISOString()
+        }));
+      }
+    }
+  } catch {
+    artifacts = [];
+  }
+
+  // 解析 structured_output
+  let structuredOutput: StructuredOutput | null = null;
+  try {
+    if (row.structured_output && row.structured_output !== '{}') {
+      structuredOutput = JSON.parse(row.structured_output);
+    }
+  } catch {
+    structuredOutput = null;
+  }
+
   return {
     id: row.id,
     instanceId: row.instance_id,
@@ -622,7 +662,8 @@ function rowToStageRun(row: any): StageRun {
     status: row.status,
     input: row.input,
     output: row.output,
-    artifacts: JSON.parse(row.artifacts || '[]'),
+    structuredOutput,
+    artifacts,
     startedAt: row.started_at,
     completedAt: row.completed_at,
     error: row.error,

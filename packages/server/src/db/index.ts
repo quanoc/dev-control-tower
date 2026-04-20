@@ -59,6 +59,11 @@ export function getDb(): Database.Database {
         "ALTER TABLE pipeline_stage_runs ADD COLUMN timeout_seconds INTEGER DEFAULT 300"
       );
     }
+    if (!stageRunsColumns.some(c => c.name === 'structured_output')) {
+      db.exec(
+        "ALTER TABLE pipeline_stage_runs ADD COLUMN structured_output TEXT DEFAULT '{}'"
+      );
+    }
 
     // Migrate agents table for multi-agent support
     const agentsColumns = db.prepare(
