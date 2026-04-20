@@ -322,18 +322,39 @@ export interface StageRun {
 
 // ─── Structured Output Types ─────────────────────────────────────
 
-export interface StructuredOutput {
+/**
+ * Information passed to the next step.
+ * The agent decides what's relevant for the next step.
+ */
+export interface NextStepInput {
+  /** One-line summary of what was done (required) */
   summary: string;
-  keyPoints: string[];
-  decisions: Array<{
+  /** Key deliverables/outputs */
+  keyPoints?: string[];
+  /** Decisions made that affect downstream steps */
+  decisions?: Array<{
     decision: string;
-    reason: string;
-    impact?: string;
+    reason?: string;
   }>;
-  risks?: string[];
-  artifacts: Artifact[];
-  rawOutputRef?: string;
+  /** Recommendations for the next step */
+  recommendations?: string[];
+  /** Any additional context (flexible) */
+  [key: string]: unknown;
 }
+
+/**
+ * Structured output from a step execution.
+ * Agent outputs this JSON format directly.
+ */
+export interface StructuredOutput {
+  /** Artifacts produced (docs, PRs, deployments) */
+  artifacts: Artifact[];
+  /** Information for the next step */
+  nextStepInput: NextStepInput;
+}
+
+/** @deprecated Use StructuredOutput instead */
+export type StepOutput = StructuredOutput;
 
 // ─── State Transition Log ──────────────────────────────────────
 

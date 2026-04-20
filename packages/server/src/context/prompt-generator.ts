@@ -1,311 +1,12 @@
 /**
- * Prompt Generator
+ * Prompt Generator - Simplified
  *
- * Generates action-specific prompts for agent execution using:
- * 1. Structured context from ContextBuilder
- * 2. Action-specific templates
- * 3. Input parameters for the action
+ * Generates prompts based on step's goal, expectedOutput, and nextStepHint.
+ * Requires agent to output JSON format.
  */
 
-import type { ChainContext, StructuredOutput } from './types';
+import type { StepContext, StepOutput } from './types.js';
 import type { Agent } from '@pipeline/shared';
-
-/**
- * Action-specific prompt templates.
- */
-const ACTION_PROMPTS: Record<string, { instruction: string; outputFormat: string }> = {
-  requirements_analysis: {
-    instruction: `Analyze the task requirements and produce a clear, structured requirements document.
-
-Focus on:
-1. Core functional requirements
-2. Non-functional requirements (performance, security, scalability)
-3. User acceptance criteria
-4. Technical constraints
-5. Dependencies and assumptions`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of the requirements analysis]
-
-## Key Points
-- [Point 1]
-- [Point 2]
-- [Point 3]
-
-## Decisions
-- **Decision**: [Decision] - **Reason**: [Why this decision was made]
-
-## Risks
-- [Risk 1]
-- [Risk 2]
-
-## Artifacts
-- [Document URL or reference]`,
-  },
-
-  architecture_design: {
-    instruction: `Design the system architecture based on the requirements analysis.
-
-Focus on:
-1. High-level architecture pattern (microservices, monolith, etc.)
-2. Key components and their responsibilities
-3. Data flow and interactions
-4. Technology choices and rationale
-5. Scalability and performance considerations`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of the architecture design]
-
-## Key Points
-- [Architecture pattern chosen]
-- [Key components]
-- [Data flow]
-
-## Decisions
-- **Decision**: [Technology/Pattern] - **Reason**: [Why]
-
-## Risks
-- [Potential architectural risks]
-
-## Artifacts
-- [Architecture diagram URL]
-- [Design document URL]`,
-  },
-
-  tech_design: {
-    instruction: `Create detailed technical design based on architecture design.
-
-Focus on:
-1. API specifications
-2. Database schema
-3. Module/class structure
-4. Interface definitions
-5. Implementation approach`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of the technical design]
-
-## Key Points
-- [API endpoints]
-- [Database tables]
-- [Key modules]
-
-## Decisions
-- **Decision**: [Implementation approach] - **Reason**: [Why]
-
-## Artifacts
-- [API spec URL]
-- [Schema design URL]`,
-  },
-
-  code: {
-    instruction: `Implement the functionality according to the technical design.
-
-Focus on:
-1. Writing clean, maintainable code
-2. Following project conventions
-3. Proper error handling
-4. Testability considerations
-5. Documentation where necessary`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of what was implemented]
-
-## Key Points
-- [Features implemented]
-- [Files modified/created]
-
-## Decisions
-- **Decision**: [Implementation choice] - **Reason**: [Why]
-
-## Artifacts
-- [PR URL]
-- [Commit URL]`,
-  },
-
-  code_review: {
-    instruction: `Review the code implementation for quality, correctness, and best practices.
-
-Focus on:
-1. Code correctness
-2. Design patterns and conventions
-3. Potential bugs or issues
-4. Performance considerations
-5. Security concerns`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of the review findings]
-
-## Key Points
-- [Major findings]
-- [Recommendations]
-
-## Decisions
-- **Decision**: [Approved/Changes needed] - **Reason**: [Why]
-
-## Risks
-- [Issues that need attention]
-
-## Artifacts
-- [Review report URL]`,
-  },
-
-  unit_test: {
-    instruction: `Write unit tests for the implemented code.
-
-Focus on:
-1. Test coverage of core functionality
-2. Edge cases and error scenarios
-3. Test isolation and reliability
-4. Clear test naming and organization
-5. Assertion clarity`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of test coverage]
-
-## Key Points
-- [Test cases written]
-- [Coverage percentage]
-
-## Decisions
-- **Decision**: [Test approach] - **Reason**: [Why]
-
-## Artifacts
-- [Test report URL]`,
-  },
-
-  integration_test: {
-    instruction: `Write integration tests for the system components.
-
-Focus on:
-1. Integration scenarios
-2. API endpoint testing
-3. Database interactions
-4. Service communication
-5. Error handling flows`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of integration test coverage]
-
-## Key Points
-- [Integration scenarios tested]
-- [Coverage areas]
-
-## Decisions
-- **Decision**: [Test approach] - **Reason**: [Why]
-
-## Artifacts
-- [Integration test report URL]`,
-  },
-
-  security_scan: {
-    instruction: `Analyze the code for security vulnerabilities and concerns.
-
-Focus on:
-1. OWASP Top 10 vulnerabilities
-2. Authentication and authorization
-3. Input validation and sanitization
-4. Data protection
-5. Dependency security`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of security analysis]
-
-## Key Points
-- [Vulnerabilities found]
-- [Security measures in place]
-
-## Decisions
-- **Decision**: [Security status] - **Reason**: [Why]
-
-## Risks
-- [Security risks identified]
-
-## Artifacts
-- [Security report URL]`,
-  },
-
-  deploy: {
-    instruction: `Prepare and execute deployment of the implemented changes.
-
-Focus on:
-1. Deployment preparation checklist
-2. Environment configuration
-3. Rollout strategy
-4. Monitoring setup
-5. Rollback plan`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of deployment status]
-
-## Key Points
-- [Deployment steps completed]
-- [Environment deployed to]
-
-## Decisions
-- **Decision**: [Deployment strategy] - **Reason**: [Why]
-
-## Artifacts
-- [Deploy URL]
-- [Deployment log URL]`,
-  },
-
-  documentation: {
-    instruction: `Create documentation for the implemented functionality.
-
-Focus on:
-1. User documentation
-2. API documentation
-3. Architecture overview
-4. Configuration guide
-5. Troubleshooting guide`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary of documentation created]
-
-## Key Points
-- [Documentation sections]
-- [Coverage areas]
-
-## Artifacts
-- [Documentation URL]`,
-  },
-
-  // Default template for unknown action types
-  _default: {
-    instruction: `Execute the assigned task based on the provided context.
-
-Focus on:
-1. Understanding the requirements
-2. Following best practices
-3. Producing quality output
-4. Documenting key decisions`,
-    outputFormat: `Provide your output in this structured format:
-
-## Summary
-[One paragraph summary]
-
-## Key Points
-- [Key point 1]
-- [Key point 2]
-
-## Decisions
-- **Decision**: [Decision] - **Reason**: [Why]
-
-## Artifacts
-- [Artifact URLs]`,
-  },
-};
 
 /**
  * PromptGenerator generates prompts for agent execution.
@@ -313,49 +14,29 @@ Focus on:
 export class PromptGenerator {
   /**
    * Generate a complete prompt for agent execution.
-   *
-   * @param context - ChainContext with relevant previous outputs
-   * @param agent - Agent to execute
-   * @param inputParams - Input parameters for this action
-   * @returns Complete prompt string
    */
   generate(
-    context: ChainContext,
-    agent: Agent,
-    inputParams: Record<string, any>
+    context: StepContext,
+    agent: Agent
   ): string {
-    const actionPrompt = ACTION_PROMPTS[context.actionType] || ACTION_PROMPTS._default;
-
     const sections: string[] = [];
 
-    // 1. Agent identity section
+    // 1. Agent identity
     sections.push(this.buildAgentSection(agent));
 
-    // 2. Task section (current action)
-    sections.push(this.buildTaskSection(context, actionPrompt, inputParams));
+    // 2. Task info
+    sections.push(this.buildTaskSection(context));
 
-    // 3. Context section (relevant previous outputs)
-    if (context.relevantOutputs.length > 0) {
-      sections.push(this.buildContextSection(context));
+    // 3. Previous step's output (if any)
+    if (context.previousOutput) {
+      sections.push(this.buildPreviousOutputSection(context.previousOutput));
     }
 
-    // 4. Artifacts section (accumulated from previous stages)
-    if (context.accumulatedArtifacts.length > 0) {
-      sections.push(this.buildArtifactsSection(context));
-    }
+    // 4. Current step's goal and expected output
+    sections.push(this.buildGoalSection(context));
 
-    // 5. Approvals section (approval history)
-    if (context.approvals.length > 0) {
-      sections.push(this.buildApprovalsSection(context));
-    }
-
-    // 6. Pipeline/Task info section
-    if (context.pipelineInfo || context.taskInfo) {
-      sections.push(this.buildInfoSection(context));
-    }
-
-    // 7. Output format reminder
-    sections.push(this.buildOutputFormatSection(actionPrompt));
+    // 5. Output format requirement
+    sections.push(this.buildOutputFormatSection(context));
 
     return sections.join('\n\n---\n\n');
   }
@@ -366,187 +47,130 @@ export class PromptGenerator {
   private buildAgentSection(agent: Agent): string {
     return `## Agent Role
 
-You are **${agent.name}**, an AI agent specialized in ${agent.description || 'software development tasks'}.
-
-${agent.skills?.length > 0 ? `Available skills: ${agent.skills.map((s: { name: string }) => s.name).join(', ')}` : ''}`;
+You are **${agent.name}**, an AI agent.
+${agent.description ? `\n${agent.description}` : ''}`;
   }
 
   /**
-   * Build task section with action-specific instructions.
+   * Build task info section.
    */
-  private buildTaskSection(
-    context: ChainContext,
-    actionPrompt: { instruction: string; outputFormat: string },
-    inputParams: Record<string, any>
-  ): string {
-    let section = `## Current Task
+  private buildTaskSection(context: StepContext): string {
+    return `## Task Information
 
-**Action Type**: ${context.actionType}
-**Stage**: ${context.currentStageKey}
+**Title**: ${context.task.title}
 
-### Instructions
+**Description**: ${context.task.description || 'No description provided'}
 
-${actionPrompt.instruction}`;
-
-    // Add input parameters if present
-    if (inputParams && Object.keys(inputParams).length > 0) {
-      section += `\n\n### Input Parameters\n\n`;
-      for (const [key, value] of Object.entries(inputParams)) {
-        section += `- **${key}**: ${JSON.stringify(value)}\n`;
-      }
-    }
-
-    return section;
+**Pipeline**: ${context.pipeline.templateName} (Progress: ${context.pipeline.progress})`;
   }
 
   /**
-   * Build context section from relevant previous outputs.
+   * Build previous step's output section.
    */
-  private buildContextSection(context: ChainContext): string {
-    let section = `## Context from Previous Stages
+  private buildPreviousOutputSection(previousOutput: StepOutput): string {
+    let section = `## Previous Step's Output
 
-The following outputs from previous pipeline stages are relevant to your task:
+The previous step completed with the following results:
+
+### Summary
+${previousOutput.nextStepInput.summary}
 
 `;
 
-    for (const output of context.relevantOutputs) {
-      section += this.formatOutputSummary(output);
-      section += '\n\n';
+    if (previousOutput.nextStepInput.keyPoints?.length) {
+      section += `### Key Points\n`;
+      for (const point of previousOutput.nextStepInput.keyPoints) {
+        section += `- ${point}\n`;
+      }
+      section += '\n';
+    }
+
+    if (previousOutput.nextStepInput.decisions?.length) {
+      section += `### Decisions Made\n`;
+      for (const d of previousOutput.nextStepInput.decisions) {
+        section += `- **${d.decision}**`;
+        if (d.reason) section += ` (Reason: ${d.reason})`;
+        section += '\n';
+      }
+      section += '\n';
+    }
+
+    if (previousOutput.nextStepInput.recommendations?.length) {
+      section += `### Recommendations for This Step\n`;
+      for (const r of previousOutput.nextStepInput.recommendations) {
+        section += `- ${r}\n`;
+      }
+      section += '\n';
+    }
+
+    if (previousOutput.artifacts?.length) {
+      section += `### Artifacts from Previous Step\n`;
+      for (const a of previousOutput.artifacts) {
+        section += `- [${a.title || a.type}](${a.url})\n`;
+      }
     }
 
     return section.trim();
   }
 
   /**
-   * Format a single output summary for context.
+   * Build current step's goal section.
    */
-  private formatOutputSummary(output: {
-    stageKey: string;
-    stageRunId: number;
-    status: string;
-    output: StructuredOutput;
-  }): string {
-    const lines: string[] = [];
+  private buildGoalSection(context: StepContext): string {
+    let section = `## Your Goal
 
-    lines.push(`### ${output.stageKey} (Status: ${output.status})`);
-
-    if (output.output.summary) {
-      lines.push(`**Summary**: ${output.output.summary}`);
-    }
-
-    if (output.output.keyPoints.length > 0) {
-      lines.push(`**Key Points**:`);
-      for (const point of output.output.keyPoints) {
-        lines.push(`- ${point}`);
-      }
-    }
-
-    if (output.output.decisions.length > 0) {
-      lines.push(`**Decisions**:`);
-      for (const d of output.output.decisions) {
-        lines.push(`- **${d.decision}** - Reason: ${d.reason}`);
-      }
-    }
-
-    if (output.output.risks && output.output.risks.length > 0) {
-      lines.push(`**Risks**:`);
-      for (const risk of output.output.risks) {
-        lines.push(`- ${risk}`);
-      }
-    }
-
-    if (output.output.artifacts.length > 0) {
-      lines.push(`**Artifacts**:`);
-      for (const artifact of output.output.artifacts) {
-        lines.push(`- [${artifact.title || artifact.type}](${artifact.url})`);
-      }
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Build artifacts section.
-   */
-  private buildArtifactsSection(context: ChainContext): string {
-    let section = `## Accumulated Artifacts
-
-The following artifacts have been produced in previous stages:
+**${context.currentStep.goal}**
 
 `;
 
-    for (const artifact of context.accumulatedArtifacts) {
-      section += `- **${artifact.type}**: [${artifact.title || artifact.url}](${artifact.url})\n`;
-    }
-
-    return section;
-  }
-
-  /**
-   * Build approvals section.
-   */
-  private buildApprovalsSection(context: ChainContext): string {
-    let section = `## Approval History
-
-`;
-
-    for (const approval of context.approvals) {
-      const status = approval.approved ? '✅ Approved' : '❌ Rejected';
-      section += `- **${approval.stageKey}**: ${status}`;
-      if (approval.comment) {
-        section += ` - "${approval.comment}"`;
+    if (context.currentStep.expectedOutput?.length) {
+      section += `### Expected Output\n`;
+      for (const output of context.currentStep.expectedOutput) {
+        section += `- ${output}\n`;
       }
       section += '\n';
     }
 
-    return section;
-  }
-
-  /**
-   * Build pipeline/task info section.
-   */
-  private buildInfoSection(context: ChainContext): string {
-    let section = `## Background Information
-
-`;
-
-    if (context.pipelineInfo) {
-      section += `**Pipeline**: ${context.pipelineInfo.name}\n`;
-      if (context.pipelineInfo.description) {
-        section += `Description: ${context.pipelineInfo.description}\n`;
-      }
+    if (context.currentStep.nextStepHint) {
+      section += `### Information for Next Step\n`;
+      section += `Please include in your output: ${context.currentStep.nextStepHint}\n`;
     }
 
-    if (context.taskInfo) {
-      section += `**Task**: ${context.taskInfo.title}\n`;
-      if (context.taskInfo.description) {
-        section += `Description: ${context.taskInfo.description}\n`;
-      }
-      if (context.taskInfo.requirements) {
-        section += `\n### Task Requirements\n\n${context.taskInfo.requirements}\n`;
-      }
-    }
-
-    return section;
+    return section.trim();
   }
 
   /**
-   * Build output format reminder section.
+   * Build output format section - requires JSON output.
    */
-  private buildOutputFormatSection(
-    actionPrompt: { instruction: string; outputFormat: string }
-  ): string {
-    return `## Expected Output Format
+  private buildOutputFormatSection(context: StepContext): string {
+    const nextStepHint = context.currentStep.nextStepHint
+      ? `\n    // ${context.currentStep.nextStepHint}`
+      : '';
 
-${actionPrompt.outputFormat}
+    return `## Output Format (IMPORTANT)
 
-**Important**: Ensure your output follows this structured format so it can be parsed and passed to subsequent pipeline stages.`;
+You MUST output your result in the following JSON format:
+
+\`\`\`json
+{
+  "artifacts": [
+    { "type": "pr|document|deploy|test_report|other", "url": "https://...", "title": "..." }
+  ],
+  "nextStepInput": {
+    "summary": "One-line summary of what you did (required)",
+    "keyPoints": ["Key point 1", "Key point 2"],
+    "decisions": [
+      { "decision": "What you decided", "reason": "Why you decided this" }
+    ],
+    "recommendations": ["Suggestion for the next step"]${nextStepHint}
   }
+}
+\`\`\`
 
-  /**
-   * Get the action prompt template for a given action type.
-   */
-  getActionPrompt(actionType: string): { instruction: string; outputFormat: string } {
-    return ACTION_PROMPTS[actionType] || ACTION_PROMPTS._default;
+**Important**:
+1. Output valid JSON only, no additional text
+2. \`summary\` is required in \`nextStepInput\`
+3. Include any artifacts (PR links, doc links) you produced
+4. Provide useful information for the next step in \`nextStepInput\``;
   }
 }
