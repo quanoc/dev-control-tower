@@ -85,7 +85,7 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
     <Modal
       open
       onClose={onClose}
-      size="xl"
+      size="wide"
       title="流水线进度"
       footer={
         <Button variant="ghost" onClick={onClose}>关闭</Button>
