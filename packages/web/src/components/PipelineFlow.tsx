@@ -1,6 +1,6 @@
 import React from 'react';
-import type { StageRun, PipelinePhase, PipelineInstanceStatus } from '@pipeline/shared';
-import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, PauseCircle, AlertCircle, Clock } from 'lucide-react';
+import type { StageRun, PipelinePhase, PipelineInstanceStatus, PipelineStep } from '@pipeline/shared';
+import { CheckCircle, Circle, XCircle, Loader2, ArrowRight, ArrowDown, PauseCircle, AlertCircle, Clock, Bot, User, Settings } from 'lucide-react';
 import { PHASES } from '@pipeline/shared';
 
 interface PipelineFlowProps {
@@ -28,44 +28,46 @@ function getPhaseLabel(phaseKey: string) {
   return phase?.label || phaseKey;
 }
 
-function getStatusIcon(status: string, label: string) {
+function getActorIcon(actorType: string) {
+  switch (actorType) {
+    case 'agent':
+      return <Bot className="w-3 h-3" />;
+    case 'human':
+      return <User className="w-3 h-3" />;
+    case 'system':
+      return <Settings className="w-3 h-3" />;
+    default:
+      return null;
+  }
+}
+
+function getActorLabel(actorType: string) {
+  switch (actorType) {
+    case 'agent':
+      return 'AI执行';
+    case 'human':
+      return '人工审批';
+    case 'system':
+      return '系统流程';
+    default:
+      return '未知';
+  }
+}
+
+function getStatusIconCompact(status: string) {
   switch (status) {
     case 'completed':
-      return (
-        <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center" title={`${label}: 已完成`}>
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-        </div>
-      );
+      return <CheckCircle className="w-3 h-3 text-emerald-500" />;
     case 'running':
-      return (
-        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center" title={`${label}: 进行中`}>
-          <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin" />
-        </div>
-      );
+      return <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />;
     case 'failed':
-      return (
-        <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-500/20 border-2 border-red-500 flex items-center justify-center" title={`${label}: 失败`}>
-          <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-        </div>
-      );
+      return <XCircle className="w-3 h-3 text-red-500" />;
     case 'waiting_approval':
-      return (
-        <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center animate-pulse" title={`${label}: 等待审批`}>
-          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-        </div>
-      );
+      return <Clock className="w-3 h-3 text-amber-500" />;
     case 'skipped':
-      return (
-        <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center" title={`${label}: 跳过`}>
-          <PauseCircle className="w-3.5 h-3.5 text-gray-500" />
-        </div>
-      );
+      return <PauseCircle className="w-3 h-3 text-gray-400" />;
     default:
-      return (
-        <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center" title={`${label}: 待执行`}>
-          <Circle className="w-3.5 h-3.5 text-gray-400 dark:text-gray-600" />
-        </div>
-      );
+      return <Circle className="w-3 h-3 text-gray-400" />;
   }
 }
 
@@ -101,12 +103,12 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
           steps: steps.map(sr => ({
             key: sr.stageKey,
             label: sr.stepLabel || sr.stageKey,
-            actorType: 'agent' as const,
+            actorType: 'agent' as const, // Default to agent if no templatePhases
             action: 'code' as const,
             optional: false,
             icon: '⚙️',
-            execution: 'serial' as const,
           })),
+          batches: steps.map(() => 1), // Default: all serial
         }));
       })();
 
@@ -157,38 +159,90 @@ export function PipelineFlow({ stageRuns, currentStageIndex, templatePhases, com
                   {phaseLabel}
                 </div>
 
-                {/* Steps in this phase */}
-                <div className="flex flex-col items-center gap-1.5">
-                  {phase.steps.map((step) => {
-                    const stageRun = stageRunMap.get(step.key);
-                    const status = stageRun?.status || 'pending';
-                    const label = step.label;
+                {/* Steps in this phase - grouped by batches */}
+                <div className="flex flex-col items-center gap-1">
+                  {(() => {
+                    const batches = phase.batches || phase.steps.map(() => 1);
+                    let stepIdx = 0;
+                    const batchGroups: React.ReactNode[] = [];
 
-                    return (
-                      <div
-                        key={step.key}
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded border ${
-                          status === 'running' ? 'bg-blue-100 dark:bg-blue-500/20 border-blue-300 dark:border-blue-500/50' :
-                          status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/50' :
-                          status === 'failed' ? 'bg-red-100 dark:bg-red-500/20 border-red-300 dark:border-red-500/50' :
-                          status === 'waiting_approval' ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/50 animate-pulse' :
-                          'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                        }`}
-                        title={`${label}: ${status}`}
-                      >
-                        {getStatusIcon(status, label)}
-                        <span className={`text-xs whitespace-nowrap ${
-                          status === 'running' ? 'text-blue-600 dark:text-blue-400 font-medium' :
-                          status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
-                          status === 'failed' ? 'text-red-600 dark:text-red-400' :
-                          status === 'waiting_approval' ? 'text-amber-600 dark:text-amber-400 font-medium' :
-                          'text-gray-500 dark:text-gray-400'
-                        }`}>
-                          {label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+                      const batchSize = batches[batchIdx];
+                      const batchSteps: PipelineStep[] = [];
+
+                      for (let i = 0; i < batchSize && stepIdx < phase.steps.length; i++) {
+                        batchSteps.push(phase.steps[stepIdx++]);
+                      }
+
+                      // Render batch (parallel steps grouped horizontally)
+                      const batchNodes = batchSteps.map((step) => {
+                        const stageRun = stageRunMap.get(step.key);
+                        const status = stageRun?.status || 'pending';
+                        const label = step.label;
+                        const actorType = step.actorType;
+
+                        return (
+                          <div
+                            key={step.key}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded border ${
+                              status === 'running' ? 'bg-blue-100 dark:bg-blue-500/20 border-blue-300 dark:border-blue-500/50' :
+                              status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/50' :
+                              status === 'failed' ? 'bg-red-100 dark:bg-red-500/20 border-red-300 dark:border-red-500/50' :
+                              status === 'waiting_approval' ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/50 animate-pulse' :
+                              'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                            }`}
+                            title={`${label} (${getActorLabel(actorType)}): ${status}`}
+                          >
+                            {getStatusIconCompact(status)}
+                            {/* Actor type icon */}
+                            <span className={`flex items-center gap-0.5 ${
+                              actorType === 'agent' ? 'text-purple-500 dark:text-purple-400' :
+                              actorType === 'human' ? 'text-orange-500 dark:text-orange-400' :
+                              'text-gray-500 dark:text-gray-400'
+                            }`} title={getActorLabel(actorType)}>
+                              {getActorIcon(actorType)}
+                            </span>
+                            <span className={`text-xs whitespace-nowrap ${
+                              status === 'running' ? 'text-blue-600 dark:text-blue-400 font-medium' :
+                              status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
+                              status === 'failed' ? 'text-red-600 dark:text-red-400' :
+                              status === 'waiting_approval' ? 'text-amber-600 dark:text-amber-400 font-medium' :
+                              'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      });
+
+                      // Parallel batch: steps grouped together vertically with tight spacing
+                      if (batchSize > 1) {
+                        batchGroups.push(
+                          <div key={`batch-${batchIdx}`} className="flex flex-col items-center gap-0.5">
+                            {batchNodes}
+                          </div>
+                        );
+                      } else {
+                        // Serial batch: single step
+                        batchGroups.push(
+                          <div key={`batch-${batchIdx}`}>
+                            {batchNodes}
+                          </div>
+                        );
+                      }
+
+                      // Add arrow down between batches (serial separator)
+                      if (batchIdx < batches.length - 1) {
+                        batchGroups.push(
+                          <div key={`sep-${batchIdx}`} className="flex items-center justify-center">
+                            <ArrowDown className="w-3 h-3 text-gray-400 dark:text-gray-600" />
+                          </div>
+                        );
+                      }
+                    }
+
+                    return batchGroups;
+                  })()}
                 </div>
               </div>
 
