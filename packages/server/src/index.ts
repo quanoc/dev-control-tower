@@ -8,6 +8,7 @@ import * as queries from './db/queries.js';
 import agentsRouter from './routes/agents.js';
 import tasksRouter from './routes/tasks.js';
 import pipelinesRouter from './routes/pipelines.js';
+import chatRouter from './routes/chat.js';
 import { DEFAULT_PIPELINE_PHASES } from '@pipeline/shared';
 import { initializeAgentTags } from './db/agent-sync.js';
 import { pipelineScheduler } from './engine/scheduler.js';
@@ -26,6 +27,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/agents', agentsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/pipelines', pipelinesRouter);
+app.use('/api/chat', chatRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

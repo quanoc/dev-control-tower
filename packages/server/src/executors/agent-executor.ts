@@ -144,35 +144,34 @@ export class AgentExecutor implements StageExecutor {
   private async executeMock(context: ExecutionContext): Promise<ExecutionResult> {
     const { agentId, action, componentId, instanceId, stageKey } = context;
 
-    await this.delay(2000 + Math.random() * 3000);
+    await this.delay(500);
 
-    const success = Math.random() < 0.8;
-
-    if (success) {
-      const mockOutput = {
-        artifacts: this.getMockArtifacts(action),
-        nextStepInput: {
-          summary: `[Mock] ${action} completed successfully`,
-          keyPoints: ['Mock key point 1', 'Mock key point 2'],
-        }
-      };
-
-      // 更新共享上下文
-      if (instanceId) {
-        this.updateRuntimeContext(instanceId, stageKey || action, mockOutput);
+    // Mock 模式总是返回成功，便于测试
+    const mockOutput = {
+      artifacts: this.getMockArtifacts(action),
+      nextStepInput: {
+        summary: `[Mock] ${action} completed successfully`,
+        keyPoints: ['Mock key point 1', 'Mock key point 2'],
       }
+    };
 
-      return {
-        success: true,
-        output: JSON.stringify(mockOutput),
-        artifacts: mockOutput.artifacts,
-        metadata: { componentId, action, executionTime: Date.now() }
-      };
+    // 更新共享上下文（仅当 instanceId 存在且有对应实例时）
+    if (instanceId) {
+      try {
+        const instance = queries.getPipelineInstanceById(instanceId);
+        if (instance) {
+          this.updateRuntimeContext(instanceId, stageKey || action, mockOutput);
+        }
+      } catch {
+        // 忽略错误（可能是测试环境没有对应实例）
+      }
     }
 
     return {
-      success: false,
-      error: `[Mock] Agent "${agentId || 'default'}" failed action "${action}"`
+      success: true,
+      output: JSON.stringify(mockOutput),
+      artifacts: mockOutput.artifacts,
+      metadata: { componentId, action, executionTime: Date.now() }
     };
   }
 

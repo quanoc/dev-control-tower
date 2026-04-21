@@ -167,6 +167,65 @@ router.post('/:id/pipeline/stop', async (req, res) => {
   }
 });
 
+// POST /api/tasks/:id/pipeline/pause - Pause a running pipeline
+router.post('/:id/pipeline/pause', async (req, res) => {
+  try {
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.pause(instance.id);
+    res.json({ message: 'Pipeline paused' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/resume - Resume a paused pipeline
+router.post('/:id/pipeline/resume', async (req, res) => {
+  try {
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.resume(instance.id);
+    res.json({ message: 'Pipeline resumed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/tasks/:id/pipeline/retry-from - Retry from a specific stage
+router.post('/:id/pipeline/retry-from', async (req, res) => {
+  try {
+    const { stageKey } = req.body;
+    if (!stageKey) return res.status(400).json({ error: 'stageKey is required' });
+
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    await pipelineExecutor.retryFrom(instance.id, stageKey);
+    res.json({ message: `Pipeline retrying from stage "${stageKey}"` });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/tasks/:id/pipeline/progress - Get pipeline progress
+router.get('/:id/pipeline/progress', (req, res) => {
+  try {
+    const instance = queries.getPipelineInstanceByTaskId(Number(req.params.id));
+    if (!instance) return res.status(404).json({ error: 'No pipeline found for this task' });
+
+    const progress = pipelineExecutor.getProgress(instance.id);
+    res.json(progress);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 // DELETE /api/tasks/:id - Delete a task
 router.delete('/:id', (req, res) => {
   const id = Number(req.params.id);

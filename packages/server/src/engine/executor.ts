@@ -351,6 +351,126 @@ export class PipelineExecutor {
   }
 
   /**
+   * 暂停流水线
+   * 当前步骤会继续执行完成，后续步骤暂停
+   */
+  async pause(instanceId: number): Promise<void> {
+    const instance = queries.getPipelineInstanceById(instanceId);
+    if (!instance) {
+      throw new Error(`Pipeline instance ${instanceId} not found`);
+    }
+
+    if (instance.status !== 'running') {
+      throw new Error(`Pipeline is not running, current status: ${instance.status}`);
+    }
+
+    await stateMachine.transition('pipeline', instanceId, 'paused', 'human');
+
+    console.log(`[Executor] Pipeline ${instanceId} paused`);
+  }
+
+  /**
+   * 继续流水线
+   */
+  async resume(instanceId: number): Promise<void> {
+    const instance = queries.getPipelineInstanceById(instanceId);
+    if (!instance) {
+      throw new Error(`Pipeline instance ${instanceId} not found`);
+    }
+
+    if (instance.status !== 'paused') {
+      throw new Error(`Pipeline is not paused, current status: ${instance.status}`);
+    }
+
+    await stateMachine.transition('pipeline', instanceId, 'running', 'human');
+
+    console.log(`[Executor] Pipeline ${instanceId} resumed`);
+
+    // 继续执行下一阶段
+    await this.executeNextStage(instanceId);
+  }
+
+  /**
+   * 重拾 Step
+   * 从指定 step 重新执行，该 step 及后续所有步骤状态改为 pending
+   */
+  async retryFrom(instanceId: number, stageKey: string): Promise<void> {
+    const instance = queries.getPipelineInstanceById(instanceId);
+    if (!instance) {
+      throw new Error(`Pipeline instance ${instanceId} not found`);
+    }
+
+    // 找到指定 step 的索引
+    const targetIndex = instance.stageRuns.findIndex(sr => sr.stageKey === stageKey);
+    if (targetIndex === -1) {
+      throw new Error(`Stage "${stageKey}" not found in pipeline`);
+    }
+
+    // 该 step 及后续所有步骤状态改为 pending
+    for (let i = targetIndex; i < instance.stageRuns.length; i++) {
+      const stage = instance.stageRuns[i];
+      // 只重置非 pending 的步骤
+      if (stage.status !== 'pending') {
+        await stateMachine.transition('stage', stage.id, 'pending', 'human');
+      }
+    }
+
+    // 流水线状态改为 running
+    if (instance.status !== 'running') {
+      await stateMachine.transition('pipeline', instanceId, 'running', 'human');
+      await stateMachine.transition('task', instance.taskId, 'running', 'human');
+    }
+
+    console.log(`[Executor] Pipeline ${instanceId} retrying from stage "${stageKey}"`);
+
+    // 执行该 step
+    await this.executeStage(instanceId, instance.stageRuns[targetIndex].id);
+  }
+
+  /**
+   * 获取流水线进度
+   */
+  getProgress(instanceId: number): {
+    instanceId: number;
+    status: string;
+    currentStage: string | null;
+    totalStages: number;
+    completedStages: number;
+    failedStages: number;
+    stages: Array<{
+      key: string;
+      label: string;
+      status: string;
+    }>;
+  } | null {
+    const instance = queries.getPipelineInstanceById(instanceId);
+    if (!instance) return null;
+
+    const completedCount = instance.stageRuns.filter(
+      sr => sr.status === 'completed' || sr.status === 'skipped'
+    ).length;
+    const failedCount = instance.stageRuns.filter(sr => sr.status === 'failed').length;
+
+    const currentStage = instance.stageRuns.find(sr =>
+      sr.status === 'running' || sr.status === 'waiting_approval'
+    );
+
+    return {
+      instanceId,
+      status: instance.status,
+      currentStage: currentStage?.stageKey || null,
+      totalStages: instance.stageRuns.length,
+      completedStages: completedCount,
+      failedStages: failedCount,
+      stages: instance.stageRuns.map(sr => ({
+        key: sr.stageKey,
+        label: sr.stepLabel || sr.stageKey,
+        status: sr.status,
+      })),
+    };
+  }
+
+  /**
    * 获取阶段元信息
    */
   private getStageMeta(instance: PipelineInstance, stageKey: string): {
