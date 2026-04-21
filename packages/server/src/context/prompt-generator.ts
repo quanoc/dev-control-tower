@@ -1,43 +1,37 @@
 /**
- * Prompt Generator - Simplified
+ * Prompt Generator - Layered Context Design
  *
- * Generates prompts based on step's goal, expectedOutput, and runtimeContext.
- * Requires agent to output JSON format.
+ * Generates prompts based on:
+ * - Task context (shared across all phases)
+ * - Phase context (shared within phase)
+ * - Step context (goal, inputContract, outputContract)
  */
 
 import type { StepContext, StepOutput } from './types.js';
-import type { Agent, RuntimeContext } from '@pipeline/shared';
+import type { Agent, RuntimeContext, OutputContract } from '@pipeline/shared';
 
-/**
- * PromptGenerator generates prompts for agent execution.
- */
 export class PromptGenerator {
   /**
    * Generate a complete prompt for agent execution.
    */
-  generate(
-    context: StepContext,
-    agent: Agent
-  ): string {
+  generate(context: StepContext, agent: Agent): string {
     const sections: string[] = [];
 
     // 1. Agent identity
     sections.push(this.buildAgentSection(agent));
 
-    // 2. Task info
-    sections.push(this.buildTaskSection(context));
+    // 2. Task context (任务级，所有 Agent 共享)
+    sections.push(this.buildTaskContextSection(context));
 
-    // 3. Runtime context (任务级别的共享上下文，优先)
-    if (context.runtimeContext) {
-      sections.push(this.buildRuntimeContextSection(context.runtimeContext));
+    // 3. Phase context (阶段级，同 Phase 内共享)
+    if (context.phase) {
+      sections.push(this.buildPhaseContextSection(context.phase));
     }
 
-    // 4. Previous step's output (保留用于追溯)
-    if (context.previousOutput) {
-      sections.push(this.buildPreviousOutputSection(context.previousOutput));
-    }
+    // 4. Step context (步骤级，当前步骤特定)
+    sections.push(this.buildStepContextSection(context));
 
-    // 5. Current step's goal and expected output
+    // 5. Goal and output contract
     sections.push(this.buildGoalSection(context));
 
     // 6. Output format requirement
@@ -57,65 +51,88 @@ ${agent.description ? `\n${agent.description}` : ''}`;
   }
 
   /**
-   * Build task info section.
+   * Build task context section (任务级上下文).
    */
-  private buildTaskSection(context: StepContext): string {
-    return `## Task Information
+  private buildTaskContextSection(context: StepContext): string {
+    let section = `## Task Context (Task Level)
 
 **Title**: ${context.task.title}
 
 **Description**: ${context.task.description || 'No description provided'}
 
 **Pipeline**: ${context.pipeline.templateName} (Progress: ${context.pipeline.progress})`;
+
+    if (context.task.background) {
+      section += `\n\n**Background**: ${context.task.background}`;
+    }
+
+    if (context.task.constraints?.length) {
+      section += `\n\n**Task Constraints**:\n`;
+      for (const c of context.task.constraints) {
+        section += `- ${c}\n`;
+      }
+    }
+
+    return section;
   }
 
   /**
-   * Build runtime context section (任务级别的共享上下文).
+   * Build phase context section (阶段级上下文).
    */
-  private buildRuntimeContextSection(ctx: RuntimeContext): string {
-    let section = `## Task Context (Shared)
+  private buildPhaseContextSection(phase: NonNullable<StepContext['phase']>): string {
+    let section = `## Phase Context: ${phase.label}
 
-This is the accumulated context from previous steps:
+**Phase Goal**: ${phase.goal}`;
 
-### Summary
-${ctx.summary}
+    if (phase.constraints?.length) {
+      section += `\n\n**Phase Constraints**:\n`;
+      for (const c of phase.constraints) {
+        section += `- ${c}\n`;
+      }
+    }
 
-`;
-
-    if (ctx.keyDecisions?.length) {
-      section += `### Key Decisions\n`;
-      for (const d of ctx.keyDecisions) {
+    if (phase.decisions?.length) {
+      section += `\n\n**Decisions Made in This Phase**:\n`;
+      for (const d of phase.decisions) {
         section += `- **${d.decision}** (from ${d.from})`;
         if (d.reason) section += ` - ${d.reason}`;
         section += '\n';
       }
-      section += '\n';
     }
 
-    if (ctx.constraints?.length) {
-      section += `### Constraints\n`;
-      for (const c of ctx.constraints) {
-        section += `- ${c}\n`;
-      }
-      section += '\n';
-    }
-
-    if (ctx.artifacts?.length) {
-      section += `### Accumulated Artifacts\n`;
-      for (const a of ctx.artifacts) {
+    if (phase.artifacts?.length) {
+      section += `\n\n**Phase Artifacts**:\n`;
+      for (const a of phase.artifacts) {
         section += `- [${a.title || a.type}](${a.url})\n`;
       }
-      section += '\n';
     }
 
-    if (ctx.risks?.length) {
-      section += `### Risks\n`;
-      for (const r of ctx.risks) {
-        section += `- ${r}\n`;
-      }
+    return section;
+  }
+
+  /**
+   * Build step context section (步骤级上下文).
+   */
+  private buildStepContextSection(context: StepContext): string {
+    const sections: string[] = [];
+
+    // Previous step's output
+    if (context.step.previousOutput) {
+      sections.push(this.buildPreviousOutputSection(context.step.previousOutput));
     }
 
-    return section.trim();
+    // Step history (for retries)
+    if (context.step.history?.length) {
+      sections.push(this.buildHistorySection(context.step.history));
+    }
+
+    if (sections.length === 0) {
+      return `## Step Context
+
+This is the first step in this phase.`;
+    }
+
+    return sections.join('\n\n');
   }
 
   /**
@@ -124,82 +141,157 @@ ${ctx.summary}
   private buildPreviousOutputSection(previousOutput: StepOutput): string {
     let section = `## Previous Step's Output
 
-The previous step completed with the following results:
-
-### Summary
-${previousOutput.nextStepInput.summary}
-
-`;
+**Summary**: ${previousOutput.nextStepInput.summary}`;
 
     if (previousOutput.nextStepInput.keyPoints?.length) {
-      section += `### Key Points\n`;
+      section += `\n\n**Key Points**:\n`;
       for (const point of previousOutput.nextStepInput.keyPoints) {
         section += `- ${point}\n`;
       }
-      section += '\n';
     }
 
     if (previousOutput.nextStepInput.decisions?.length) {
-      section += `### Decisions Made\n`;
+      section += `\n\n**Decisions Made**:\n`;
       for (const d of previousOutput.nextStepInput.decisions) {
         section += `- **${d.decision}**`;
         if (d.reason) section += ` (Reason: ${d.reason})`;
         section += '\n';
       }
-      section += '\n';
     }
 
     if (previousOutput.nextStepInput.recommendations?.length) {
-      section += `### Recommendations for This Step\n`;
+      section += `\n\n**Recommendations for This Step**:\n`;
       for (const r of previousOutput.nextStepInput.recommendations) {
         section += `- ${r}\n`;
       }
-      section += '\n';
     }
 
     if (previousOutput.artifacts?.length) {
-      section += `### Artifacts from Previous Step\n`;
+      section += `\n\n**Artifacts**:\n`;
       for (const a of previousOutput.artifacts) {
         section += `- [${a.title || a.type}](${a.url})\n`;
       }
     }
 
-    return section.trim();
+    return section;
   }
 
   /**
-   * Build current step's goal section.
+   * Build history section (for retry scenarios).
    */
-  private buildGoalSection(context: StepContext): string {
-    let section = `## Your Goal
+  private buildHistorySection(
+    history: Array<{ stageKey: string; attempt: number; result: 'success' | 'failure'; error?: string }>
+  ): string {
+    let section = `## Previous Attempts
 
-**${context.currentStep.goal}**
+This step has been attempted before:\n`;
 
-`;
-
-    if (context.currentStep.expectedOutput?.length) {
-      section += `### Expected Output\n`;
-      for (const output of context.currentStep.expectedOutput) {
-        section += `- ${output}\n`;
-      }
+    for (const h of history) {
+      section += `- Attempt ${h.attempt}: **${h.result.toUpperCase()}**`;
+      if (h.error) section += ` - ${h.error}`;
       section += '\n';
     }
 
-    if (context.currentStep.nextStepHint) {
-      section += `### Information for Next Step\n`;
-      section += `Please include in your output: ${context.currentStep.nextStepHint}\n`;
+    section += '\nPlease learn from previous attempts and avoid the same mistakes.';
+
+    return section;
+  }
+
+  /**
+   * Build goal section with input/output contracts.
+   */
+  private buildGoalSection(context: StepContext): string {
+    const { currentStep } = context;
+    let section = `## Your Goal
+
+**${currentStep.goal}**`;
+
+    // Input contract - what this step needs
+    if (currentStep.inputContract) {
+      const input = currentStep.inputContract;
+      section += `\n\n### Input Requirements`;
+
+      if (input.requires?.length) {
+        section += `\nYou need the following inputs:\n`;
+        for (const r of input.requires) {
+          section += `- ${r}\n`;
+        }
+      }
+
+      if (input.focusFields?.length) {
+        section += `\nFocus on these fields:\n`;
+        for (const f of input.focusFields) {
+          section += `- ${f}\n`;
+        }
+      }
+
+      if (input.hint) {
+        section += `\n**Hint**: ${input.hint}`;
+      }
     }
 
-    return section.trim();
+    // Output contract - what this step should produce
+    if (currentStep.outputContract) {
+      section += this.buildOutputContractSection(currentStep.outputContract);
+    }
+
+    // Review criteria
+    if (currentStep.criteria?.length) {
+      section += `\n\n### Success Criteria\n`;
+      for (const c of currentStep.criteria) {
+        section += `- ${c}\n`;
+      }
+    }
+
+    return section;
+  }
+
+  /**
+   * Build output contract section.
+   */
+  private buildOutputContractSection(contract: OutputContract): string {
+    let section = `\n\n### Expected Output`;
+
+    if (contract.requiredFields?.length) {
+      section += `\nYou MUST provide:\n`;
+      for (const field of contract.requiredFields) {
+        const def = contract.fields?.[field];
+        if (def) {
+          section += `- **${field}** (${def.type})`;
+          if (def.description) section += `: ${def.description}`;
+          if (def.required !== false) section += ` (required)`;
+          section += '\n';
+        } else {
+          section += `- **${field}** (required)\n`;
+        }
+      }
+    }
+
+    if (contract.example) {
+      section += `\n**Example**:\n\`\`\`json\n${JSON.stringify(contract.example, null, 2)}\n\`\`\``;
+    }
+
+    return section;
   }
 
   /**
    * Build output format section - requires JSON output.
    */
   private buildOutputFormatSection(context: StepContext): string {
-    const nextStepHint = context.currentStep.nextStepHint
-      ? `\n    // ${context.currentStep.nextStepHint}`
-      : '';
+    const { currentStep } = context;
+
+    // Generate field hints based on output contract
+    let fieldExamples = `
+    "summary": "One-line summary of what you did",`;
+
+    if (currentStep.outputContract?.requiredFields) {
+      for (const field of currentStep.outputContract.requiredFields) {
+        if (field !== 'summary') {
+          fieldExamples += `
+    "${field}": "...",`;
+        }
+      }
+    }
 
     return `## Output Format (IMPORTANT)
 
@@ -210,13 +302,12 @@ You MUST output your result in the following JSON format:
   "artifacts": [
     { "type": "pr|document|deploy|test_report|other", "url": "https://...", "title": "..." }
   ],
-  "nextStepInput": {
-    "summary": "One-line summary of what you did (required)",
+  "nextStepInput": {${fieldExamples}
     "keyPoints": ["Key point 1", "Key point 2"],
     "decisions": [
       { "decision": "What you decided", "reason": "Why you decided this" }
     ],
-    "recommendations": ["Suggestion for the next step"]${nextStepHint}
+    "recommendations": ["Suggestion for the next step"]
   }
 }
 \`\`\`

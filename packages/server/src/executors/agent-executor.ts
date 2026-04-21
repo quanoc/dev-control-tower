@@ -2,7 +2,7 @@ import type { StageExecutor, ExecutionContext, ExecutionResult, Artifact } from 
 import { OpenClawAgentClient } from '../openclaw/agent.js';
 import { ClaudeAgentClient } from '../openclaw/claude-agent.js';
 import * as queries from '../db/queries.js';
-import { ContextBuilder, PromptGenerator, OutputParser } from '../context/index.js';
+import { ContextBuilder, PromptGenerator, OutputParser, OutputValidator } from '../context/index.js';
 import type { Agent } from '@pipeline/shared';
 
 /**
@@ -24,6 +24,7 @@ export class AgentExecutor implements StageExecutor {
   private contextBuilder = new ContextBuilder();
   private promptGenerator = new PromptGenerator();
   private outputParser = new OutputParser();
+  private outputValidator = new OutputValidator();
 
   /**
    * 执行 Agent 任务
@@ -71,6 +72,20 @@ export class AgentExecutor implements StageExecutor {
       const parsed = this.outputParser.parse(result.output);
 
       if (parsed.output) {
+        // 验证输出契约
+        const outputContract = stepContext.currentStep.outputContract;
+        if (outputContract) {
+          const validationErrors = this.outputValidator.validate(parsed.output, outputContract);
+          if (validationErrors.length > 0) {
+            console.log(`[AgentExecutor] Output contract validation failed:`);
+            validationErrors.forEach(err => {
+              console.log(`  - ${err.field}: ${err.message}`);
+            });
+            // Store validation errors for debugging
+            parsed.validationErrors = validationErrors.map(e => `${e.field}: ${e.message}`);
+          }
+        }
+
         // 1. 保存结构化输出到 Step
         queries.setStageRunStructuredOutput(
           stageRunId,

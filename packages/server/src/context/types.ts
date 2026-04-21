@@ -1,11 +1,14 @@
 /**
- * Context Types - Simplified
+ * Context Types - Layered Context Design
  *
- * Each step produces structured output with artifacts and info for the next step.
+ * Supports layered context: Task → Phase → Step
+ * Each step has clear input/output contracts.
  */
 
 import type { Artifact } from '../executors/interface';
-import type { RuntimeContext } from '@pipeline/shared';
+import type { RuntimeContext, InputContract, OutputContract, PhaseKey } from '@pipeline/shared';
+
+// ─── Step Output Types ───────────────────────────────────────────
 
 /**
  * Information passed to the next step.
@@ -43,40 +46,87 @@ export interface StepOutput {
   nextStepInput: NextStepInput;
 }
 
+// ─── Layered Context Types ────────────────────────────────────────
+
+/**
+ * 任务级上下文：所有 Agent 共享
+ */
+export interface TaskContext {
+  id: number;
+  title: string;
+  description: string;
+  background?: string;
+  constraints: string[];
+}
+
+/**
+ * 阶段级上下文：同一 Phase 内共享
+ */
+export interface PhaseContext {
+  key: PhaseKey;
+  label: string;
+  goal: string;
+  constraints: string[];
+  decisions: Array<{
+    from: string;
+    decision: string;
+    reason?: string;
+  }>;
+  artifacts: Artifact[];
+}
+
+/**
+ * 步骤级上下文：仅当前 Step
+ */
+export interface StepLevelContext {
+  /** 直接前序输出 */
+  previousOutput?: StepOutput;
+  /** 历史记录（如评审失败记录） */
+  history?: Array<{
+    stageKey: string;
+    attempt: number;
+    result: 'success' | 'failure';
+    error?: string;
+  }>;
+}
+
 /**
  * Context for executing a step.
- * Contains task info, shared context, and previous step's output.
+ * Contains layered context: Task → Phase → Step
  */
 export interface StepContext {
-  /** Task information */
-  task: {
-    id: number;
-    title: string;
-    description: string;
-  };
+  /** 任务级上下文 */
+  task: TaskContext;
 
-  /** Current step info */
+  /** 阶段级上下文 */
+  phase?: PhaseContext;
+
+  /** 步骤级上下文 */
+  step: StepLevelContext;
+
+  /** 当前步骤信息 */
   currentStep: {
     key: string;
     label: string;
     action: string;
+    phaseKey?: PhaseKey;
     goal: string;
-    expectedOutput: string[];
-    nextStepHint?: string;
+    criteria?: string[];
+    inputContract?: InputContract;
+    outputContract?: OutputContract;
   };
 
-  /** 任务级别的共享上下文（优先使用） */
+  /** 共享上下文（完整引用） */
   runtimeContext?: RuntimeContext;
-
-  /** Previous step's output (保留用于追溯) */
-  previousOutput?: StepOutput;
 
   /** Pipeline info */
   pipeline: {
     templateName: string;
-    progress: string; // e.g., "2/5"
+    progress: string;
   };
 }
+
+// ─── Parsing Types ────────────────────────────────────────────────
 
 /**
  * Parsed result from agent output.
@@ -93,10 +143,15 @@ export interface ParsedOutput {
 
   /** Error message if parsing failed */
   error?: string;
+
+  /** Validation errors if output contract violated */
+  validationErrors?: string[];
 }
 
+// ─── Stage Definition ─────────────────────────────────────────────
+
 /**
- * Stage definition with goal and expected output.
+ * Stage definition with goal and contracts.
  */
 export interface StageDefinition {
   key: string;
@@ -105,14 +160,17 @@ export interface StageDefinition {
   agentId?: string;
   humanRole?: string;
   actorType: 'agent' | 'human' | 'system';
-  phaseKey?: string;
+  phaseKey?: PhaseKey;
 
   /** Goal for this step */
   goal: string;
 
-  /** Expected output format hints */
-  expectedOutput: string[];
+  /** Input contract */
+  inputContract?: InputContract;
 
-  /** Hint for what info to provide to next step */
-  nextStepHint?: string;
+  /** Output contract */
+  outputContract?: OutputContract;
+
+  /** Review/execution criteria */
+  criteria?: string[];
 }

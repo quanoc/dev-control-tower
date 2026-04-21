@@ -67,16 +67,35 @@ export interface RuntimeContext {
   summary: string;
   /** 当前阶段 */
   currentPhase?: string;
+
+  // ─── 分层存储 ───
+
+  /** 按阶段组织的约束条件 */
+  constraintsByPhase?: Record<string, string[]>;
+  /** 累积的约束条件（向后兼容） */
+  constraints?: string[];
+
+  /** 按阶段组织的产物 */
+  artifactsByPhase?: Record<string, Artifact[]>;
+  /** 累积的产物（向后兼容） */
+  artifacts?: Artifact[];
+
   /** 累积的关键决策 */
   keyDecisions: Array<{
     from: string;      // 来自哪个 step
+    phase?: string;    // 属于哪个阶段
     decision: string;
     reason?: string;
   }>;
-  /** 累积的约束条件 */
-  constraints: string[];
-  /** 累积的产物 */
-  artifacts: Artifact[];
+
+  /** 审批状态 */
+  approvals?: Record<string, {
+    approved: boolean;
+    at?: string;
+    by?: string;
+    comments?: string[];
+  }>;
+
   /** 风险提示 */
   risks?: string[];
   /** 最后更新的 step */
@@ -178,6 +197,47 @@ export function customPhase(key: string, label: string, icon = '📌', color = '
 /** How steps within a phase are executed */
 export type ExecutionMode = 'serial' | 'parallel';
 
+// ─── Step Contract Types ────────────────────────────────────────
+
+/**
+ * 输入契约：Step 需要哪些输入
+ */
+export interface InputContract {
+  /** 需要哪些前序步骤的输出 */
+  requires: string[];
+  /** 只关注这些字段（不传则传递全部） */
+  focusFields?: string[];
+  /** 上下文提示：告诉 Agent 如何理解输入 */
+  hint?: string;
+  /** 是否包含任务级上下文，默认 true */
+  includeTaskContext?: boolean;
+  /** 是否包含阶段级上下文，默认 false */
+  includePhaseContext?: boolean;
+}
+
+/**
+ * 输出字段定义
+ */
+export interface OutputFieldDef {
+  type: 'string' | 'boolean' | 'number' | 'array' | 'object';
+  description: string;
+  required: boolean;
+  enum?: string[];
+  default?: unknown;
+}
+
+/**
+ * 输出契约：Step 应该产出什么
+ */
+export interface OutputContract {
+  /** 必须输出的字段 */
+  requiredFields: string[];
+  /** 字段定义 */
+  fields: Record<string, OutputFieldDef>;
+  /** 输出示例（可选） */
+  example?: Record<string, unknown>;
+}
+
 /**
  * PipelineStep = a single executable unit within a phase.
  * Each step is performed by an actor (agent, human, or system).
@@ -192,8 +252,18 @@ export interface PipelineStep {
   humanRole?: string;
   optional: boolean;
   icon: string;
-  /** Optional reference to a reusable pipeline component */
   componentId?: number;
+
+  // ─── 契约定义 ───
+
+  /** 步骤目标：Agent 需要做什么 */
+  goal?: string;
+  /** 输入契约：需要哪些输入 */
+  inputContract?: InputContract;
+  /** 输出契约：应该产出什么 */
+  outputContract?: OutputContract;
+  /** 评审/执行标准 */
+  criteria?: string[];
 }
 
 // ─── Pipeline Phase (Level 1 container) ────────────────────────
@@ -237,6 +307,17 @@ export interface PipelineStage {
   batchIndex?: number;
   /** Optional reference to a reusable pipeline component */
   componentId?: number;
+
+  // ─── 契约定义 ───
+
+  /** 步骤目标 */
+  goal?: string;
+  /** 输入契约 */
+  inputContract?: InputContract;
+  /** 输出契约 */
+  outputContract?: OutputContract;
+  /** 评审/执行标准 */
+  criteria?: string[];
   // ─── Backward compatibility (legacy v1 fields) ───────────
   /** @deprecated Use actorType + action instead */
   type?: 'agent_action' | 'human_approval' | 'fixed_flow';

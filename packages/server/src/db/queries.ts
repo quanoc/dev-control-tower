@@ -593,22 +593,12 @@ function rowToAgent(row: any): Agent {
 }
 
 function rowToTask(row: any, pipeline?: PipelineInstance | undefined): Task {
-  let runtimeContext: RuntimeContext | undefined;
-  try {
-    if (row.runtime_context && row.runtime_context !== '{}') {
-      runtimeContext = JSON.parse(row.runtime_context);
-    }
-  } catch {
-    runtimeContext = undefined;
-  }
-
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     createdBy: row.created_by,
     status: row.status,
-    runtimeContext,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
