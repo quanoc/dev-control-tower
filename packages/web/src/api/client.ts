@@ -147,4 +147,22 @@ export const api = {
         body: JSON.stringify({ taskId, templateId }),
       }),
   },
+
+  // Chat
+  chat: {
+    sendMessage: (message: string, taskId?: number) =>
+      request<any>('/chat/message', {
+        method: 'POST',
+        body: JSON.stringify({ message, taskId }),
+      }),
+    getHistory: (taskId?: number) =>
+      request<{ history: Array<{ role: string; content: string; timestamp: string }> }>(
+        `/chat/history${taskId ? `?taskId=${taskId}` : ''}`
+      ),
+    clearHistory: (taskId?: number) =>
+      request<{ success: boolean }>(
+        `/chat/history${taskId ? `?taskId=${taskId}` : ''}`,
+        { method: 'DELETE' }
+      ),
+  },
 };

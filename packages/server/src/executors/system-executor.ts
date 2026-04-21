@@ -79,25 +79,15 @@ export class SystemExecutor implements StageExecutor {
   private async executeMock(context: ExecutionContext): Promise<ExecutionResult> {
     const { action, stageRunId } = context;
 
-    // 模拟延迟 1.5-3 秒
-    await this.delay(1500 + Math.random() * 1500);
+    await this.delay(500);
 
-    // 80% 成功率
-    const success = Math.random() < 0.8;
-
-    if (success) {
-      const mockArtifacts = this.getMockArtifacts(action, stageRunId);
-      return {
-        success: true,
-        output: `[Mock] System action "${action}" executed successfully`,
-        artifacts: mockArtifacts,
-        metadata: { action, executionTime: Date.now() }
-      };
-    }
-
+    // Mock 模式总是返回成功，便于测试
+    const mockArtifacts = this.getMockArtifacts(action, stageRunId);
     return {
-      success: false,
-      error: `[Mock] System action "${action}" failed (random 20% failure)`
+      success: true,
+      output: `[Mock] System action "${action}" executed successfully`,
+      artifacts: mockArtifacts,
+      metadata: { action, executionTime: Date.now() }
     };
   }
 

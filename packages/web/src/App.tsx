@@ -5,6 +5,7 @@ import { AgentsPage } from './pages/AgentsPage';
 import { ComponentsPage } from './pages/ComponentsPage';
 import { PipelinesPage } from './pages/PipelinesPage';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ChatWidget } from './components/ChatWidget';
 import { useAgentStore } from './store/agents';
 import { useTaskStore } from './store/tasks';
 import { useThemeStore } from './store/theme';
@@ -117,6 +118,9 @@ function App() {
       {currentPage === 'agents' && <AgentsPage />}
       {currentPage === 'components' && <ComponentsPage />}
       {currentPage === 'pipelines' && <PipelinesPage />}
+
+      {/* 小研助手 */}
+      <ChatWidget />
     </div>
   );
 }
