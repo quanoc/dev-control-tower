@@ -170,6 +170,15 @@ Agent: [调用 retry-from 1 code]
 可在 `pipeline-control.js` 中修改：
 - `API_BASE`: API 基础地址（默认 http://localhost:3001/api）
 
+## 安装
+
+```bash
+# 复制到 OpenClaw skills 目录
+cp -r docs/skills/pipeline-control ~/.openclaw/skills/
+```
+
+详见 [../README.md](../README.md)。
+
 ## 依赖
 
 - Node.js
