@@ -2,6 +2,37 @@
 
 管理 dev-control-tower 流水线平台的 Skill。
 
+## 安装
+
+### 方式一：复制到 OpenClaw skills 目录
+
+```bash
+# 复制整个目录
+cp -r skills/pipeline-control ~/.openclaw/skills/
+```
+
+### 方式二：在 openclaw.json 中启用
+
+编辑 `~/.openclaw/openclaw.json`：
+
+```json
+{
+  "skills": {
+    "entries": {
+      "pipeline-control": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+### 验证安装
+
+```bash
+node ~/.openclaw/skills/pipeline-control/pipeline-control.js help
+```
+
 ## 触发条件
 
 当用户提到以下关键词或意图时自动触发：
