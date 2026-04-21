@@ -642,7 +642,7 @@ export function PipelineManager() {
                           </span>
                         ))}
                         <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-1">
-                          / {template.stages?.length || 0} 步
+                          / {template.steps?.length || 0} 步
                         </span>
                       </div>
                     </td>

@@ -198,7 +198,7 @@ export class ContextBuilder {
   }
 
   /**
-   * Get stage definition from pipeline template.
+   * Get stage definition from pipeline instance's template phases.
    */
   private getStageDefinition(instance: any, stageKey: string): {
     key: string;
@@ -213,24 +213,41 @@ export class ContextBuilder {
     humanRole?: string;
     actorType: 'agent' | 'human' | 'system';
   } | null {
-    const stages = instance.stages || [];
-    const stage = stages.find((s: any) => s.key === stageKey);
+    // Flatten templatePhases to find the step
+    const phases = instance.templatePhases || [];
+    for (const phase of phases) {
+      const step = phase.steps?.find((s: any) => s.key === stageKey);
+      if (step) {
+        return {
+          key: step.key,
+          label: step.label,
+          action: step.action,
+          phaseKey: phase.phaseKey,
+          goal: step.goal ?? this.inferGoal(step.action, step.label),
+          criteria: step.criteria,
+          inputContract: step.inputContract,
+          outputContract: step.outputContract,
+          agentId: step.agentId,
+          humanRole: step.humanRole,
+          actorType: step.actorType || 'agent',
+        };
+      }
+    }
 
-    if (!stage) return null;
+    // Fallback: try to find from stageRuns
+    const stageRun = instance.stageRuns?.find((sr: any) => sr.stageKey === stageKey);
+    if (stageRun) {
+      return {
+        key: stageRun.stageKey,
+        label: stageRun.stepLabel || stageRun.stageKey,
+        action: stageRun.action || '',
+        phaseKey: stageRun.phaseKey,
+        goal: this.inferGoal(stageRun.action || '', stageRun.stepLabel || stageRun.stageKey),
+        actorType: 'agent',
+      };
+    }
 
-    return {
-      key: stage.key,
-      label: stage.label,
-      action: stage.action,
-      phaseKey: stage.phaseKey,
-      goal: stage.goal ?? this.inferGoal(stage.action, stage.label),
-      criteria: stage.criteria,
-      inputContract: stage.inputContract,
-      outputContract: stage.outputContract,
-      agentId: stage.agentId,
-      humanRole: stage.humanRole,
-      actorType: stage.actorType || 'agent',
-    };
+    return null;
   }
 
   /**

@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
   if (templateId) {
     const template = queries.getTemplateById(templateId);
     if (template) {
-      instanceId = queries.createPipelineInstance(taskId, templateId, template.stages);
+      instanceId = queries.createPipelineInstance(taskId, templateId, template.steps);
     }
   }
 

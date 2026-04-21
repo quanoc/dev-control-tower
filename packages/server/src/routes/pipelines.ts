@@ -1,6 +1,6 @@
 import { Router, type Router as RouterType } from 'express';
 import * as queries from '../db/queries.js';
-import { DEFAULT_PIPELINE_PHASES, DEFAULT_PIPELINE_STAGES, PRESET_TEMPLATES, flattenPhases } from '@pipeline/shared';
+import { DEFAULT_PIPELINE_PHASES, DEFAULT_PIPELINE_STEPS, PRESET_TEMPLATES, flattenPhases } from '@pipeline/shared';
 import type { PipelinePhase, PipelineComplexity } from '@pipeline/shared';
 
 const router: RouterType = Router();
@@ -16,7 +16,7 @@ router.get('/templates/preset/:complexity', (req, res) => {
   const complexity = req.params.complexity as PipelineComplexity;
   const preset = PRESET_TEMPLATES[complexity];
   if (!preset) return res.status(400).json({ error: 'Invalid complexity level. Use: small, medium, large' });
-  res.json({ name: preset.name, description: preset.description, phases: preset.phases, stages: flattenPhases(preset.phases) });
+  res.json({ name: preset.name, description: preset.description, phases: preset.phases, steps: flattenPhases(preset.phases) });
 });
 
 // POST /api/pipelines/templates - Create template
@@ -69,13 +69,13 @@ router.post('/instances', (req, res) => {
   const { taskId, templateId } = req.body;
   if (!taskId) return res.status(400).json({ error: 'taskId is required' });
 
-  let stages = DEFAULT_PIPELINE_STAGES;
+  let steps = DEFAULT_PIPELINE_STEPS;
   if (templateId) {
     const template = queries.getTemplateById(templateId);
-    if (template) stages = template.stages;
+    if (template) steps = template.steps;
   }
 
-  const id = queries.createPipelineInstance(taskId, templateId || null, stages);
+  const id = queries.createPipelineInstance(taskId, templateId || null, steps);
   res.status(201).json({ id, taskId, templateId });
 });
 

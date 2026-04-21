@@ -287,13 +287,13 @@ export interface PipelinePhase {
   batches?: number[];
 }
 
-// ─── Flattened Stage (for executor / backward compat) ──────────
+// ─── Runtime Step (for executor / storage) ──────────
 
 /**
- * Flattened representation of a PipelineStep with phase context.
- * Used by the executor and for backward compatibility.
+ * Runtime representation of a PipelineStep with execution context.
+ * Used by the executor and for storage.
  */
-export interface PipelineStage {
+export interface RuntimeStep {
   key: string;
   label: string;
   actorType: ActorType;
@@ -303,7 +303,7 @@ export interface PipelineStage {
   optional: boolean;
   icon: string;
   phaseKey: PhaseKey;
-  /** Batch index this stage belongs to within its phase */
+  /** Batch index this step belongs to within its phase */
   batchIndex?: number;
   /** Optional reference to a reusable pipeline component */
   componentId?: number;
@@ -329,9 +329,9 @@ export interface PipelineStage {
   execution?: ExecutionMode;
 }
 
-/** Flatten nested phases to a serializable stage list for executor */
-export function flattenPhases(phases: PipelinePhase[]): PipelineStage[] {
-  const stages: PipelineStage[] = [];
+/** Flatten nested phases to runtime steps for executor */
+export function flattenPhases(phases: PipelinePhase[]): RuntimeStep[] {
+  const steps: RuntimeStep[] = [];
   for (const phase of phases) {
     const batches = phase.batches || phase.steps.map(() => 1); // Default: all serial
     let stepIdx = 0;
@@ -339,25 +339,25 @@ export function flattenPhases(phases: PipelinePhase[]): PipelineStage[] {
     for (const batchSize of batches) {
       for (let i = 0; i < batchSize && stepIdx < phase.steps.length; i++) {
         const step = phase.steps[stepIdx++];
-        stages.push({ ...step, phaseKey: phase.phaseKey, batchIndex: batchIdx });
+        steps.push({ ...step, phaseKey: phase.phaseKey, batchIndex: batchIdx });
       }
       batchIdx++;
     }
   }
-  return stages;
+  return steps;
 }
 
-/** Group flat stages back into phases for editing */
-export function groupStagesIntoPhases(stages: PipelineStage[]): PipelinePhase[] {
+/** Group runtime steps back into phases for editing */
+export function groupStepsIntoPhases(steps: RuntimeStep[]): PipelinePhase[] {
   const phaseMap = new Map<PhaseKey, { steps: PipelineStep[]; batches: number[] }>();
 
-  for (const stage of stages) {
-    if (!phaseMap.has(stage.phaseKey)) {
-      phaseMap.set(stage.phaseKey, { steps: [], batches: [] });
+  for (const step of steps) {
+    if (!phaseMap.has(step.phaseKey)) {
+      phaseMap.set(step.phaseKey, { steps: [], batches: [] });
     }
-    const group = phaseMap.get(stage.phaseKey)!;
-    const { phaseKey, batchIndex, execution, ...step } = stage;
-    group.steps.push(step as PipelineStep);
+    const group = phaseMap.get(step.phaseKey)!;
+    const { phaseKey, batchIndex, execution, ...pipelineStep } = step;
+    group.steps.push(pipelineStep as PipelineStep);
     // Track batch indices
     if (batchIndex !== undefined) {
       while (group.batches.length <= batchIndex) {
@@ -391,8 +391,8 @@ export interface PipelineTemplate {
   description: string;
   /** Nested two-level structure (primary) */
   phases: PipelinePhase[];
-  /** Flattened stages for executor (derived from phases) */
-  stages: PipelineStage[];
+  /** Flattened steps for executor (derived from phases) */
+  steps: RuntimeStep[];
   /** Project complexity level */
   complexity: PipelineComplexity;
   createdAt: string;
@@ -666,7 +666,7 @@ export const PRESET_TEMPLATES: Record<PipelineComplexity, { name: string; descri
 };
 
 export const DEFAULT_PIPELINE_PHASES: PipelinePhase[] = PRESET_TEMPLATES.medium.phases;
-export const DEFAULT_PIPELINE_STAGES: PipelineStage[] = flattenPhases(DEFAULT_PIPELINE_PHASES);
+export const DEFAULT_PIPELINE_STEPS: RuntimeStep[] = flattenPhases(DEFAULT_PIPELINE_PHASES);
 
 // ─── State Transition Rules ────────────────────────────────────
 

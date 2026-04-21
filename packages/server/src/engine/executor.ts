@@ -2,7 +2,7 @@ import { stateMachine } from './statemachine.js';
 import * as queries from '../db/queries.js';
 import { ExecutorFactory } from '../executors/factory.js';
 import type { ExecutionContext, ExecutionResult, Artifact } from '../executors/interface.js';
-import type { PipelineStage, PipelineInstance, StageRun, Agent } from '@pipeline/shared';
+import type { PipelineInstance, StageRun, Agent } from '@pipeline/shared';
 import { PHASES, flattenPhases } from '@pipeline/shared';
 
 // Mock 模式配置：可通过环境变量控制

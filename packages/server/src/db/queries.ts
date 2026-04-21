@@ -10,14 +10,14 @@ import type {
   PipelineTemplate,
   PipelineInstance,
   PipelinePhase,
-  PipelineStage,
+  RuntimeStep,
   StageRun,
   StateTransitionLog,
   Artifact,
   StructuredOutput,
   RuntimeContext,
 } from '@pipeline/shared';
-import { flattenPhases, groupStagesIntoPhases } from '@pipeline/shared';
+import { flattenPhases, groupStepsIntoPhases } from '@pipeline/shared';
 
 // ─── Agent Queries ─────────────────────────────────────────────
 
@@ -356,7 +356,7 @@ export function getAllPipelineInstances(): PipelineInstance[] {
   ).all() as any[]).map(rowToInstanceWithStages);
 }
 
-export function createPipelineInstance(taskId: number, templateId: number | null, stages: PipelineStage[]): number {
+export function createPipelineInstance(taskId: number, templateId: number | null, steps: RuntimeStep[]): number {
   const db = getDb();
   const txn = db.transaction(() => {
     const instanceResult = db.prepare(
@@ -364,13 +364,13 @@ export function createPipelineInstance(taskId: number, templateId: number | null
     ).run(taskId, templateId);
     const instanceId = instanceResult.lastInsertRowid as number;
 
-    const insertStage = db.prepare(
+    const insertStep = db.prepare(
       'INSERT INTO pipeline_stage_runs (instance_id, stage_key, phase_key, step_label, agent_id) VALUES (?, ?, ?, ?, ?)'
     );
-    for (const stage of stages) {
-      // Provide default agent_id for human/system stages
-      const agentId = stage.agentId || stage.humanRole || stage.action || 'system';
-      insertStage.run(instanceId, stage.key, stage.phaseKey, stage.label, agentId);
+    for (const step of steps) {
+      // Provide default agent_id for human/system steps
+      const agentId = step.agentId || step.humanRole || step.action || 'system';
+      insertStep.run(instanceId, step.key, step.phaseKey, step.label, agentId);
     }
 
     return instanceId;
@@ -610,31 +610,31 @@ function rowToTemplate(row: any): PipelineTemplate {
   // Prefer phases column (nested DSL)
   if (row.phases) {
     const phases: PipelinePhase[] = JSON.parse(row.phases);
-    const stages = flattenPhases(phases);
+    const steps = flattenPhases(phases);
     return {
       id: row.id,
       name: row.name,
       description: row.description,
       phases,
-      stages,
+      steps,
       complexity: row.complexity || 'medium',
       createdAt: row.created_at,
     };
   }
-  // Fallback: flat stages (legacy v1)
-  const stages: PipelineStage[] = JSON.parse(row.stages || '[]').map((s: any) => ({
+  // Fallback: flat steps (legacy v1)
+  const steps: RuntimeStep[] = JSON.parse(row.stages || '[]').map((s: any) => ({
     ...s,
     type: s.type || 'agent_action',
     execution: s.execution || 'serial',
     phaseKey: s.phaseKey || 'development',
   }));
-  const phases = groupStagesIntoPhases(stages);
+  const phases = groupStepsIntoPhases(steps);
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     phases,
-    stages,
+    steps,
     complexity: row.complexity || 'medium',
     createdAt: row.created_at,
   };
@@ -649,7 +649,7 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
   // Get template info if template exists
   let templateName: string | undefined;
   let templatePhases: PipelinePhase[] | undefined;
-  let templateStages: PipelineStage[] = [];
+  let templateSteps: RuntimeStep[] = [];
   if (row.template_id) {
     const template = db.prepare('SELECT name, phases, stages FROM pipeline_templates WHERE id = ?').get(row.template_id) as { name: string; phases: string; stages: string } | undefined;
     if (template) {
@@ -658,22 +658,22 @@ function rowToInstanceWithStages(row: any): PipelineInstance {
         templatePhases = JSON.parse(template.phases);
       }
       if (template.stages) {
-        templateStages = JSON.parse(template.stages);
+        templateSteps = JSON.parse(template.stages);
       }
     }
   }
 
-  // Create lookup map from template stages
-  const stageLookup = new Map(templateStages.map(s => [s.key, s]));
+  // Create lookup map from template steps
+  const stepLookup = new Map(templateSteps.map(s => [s.key, s]));
 
   // Enrich stageRuns with data from template if missing
   const enrichedStageRuns = stageRows.map(sr => {
-    const templateStage = stageLookup.get(sr.stage_key);
+    const templateStep = stepLookup.get(sr.stage_key);
     return {
       ...rowToStageRun(sr),
       // Use stored value, or fall back to template
-      phaseKey: sr.phase_key || templateStage?.phaseKey,
-      stepLabel: sr.step_label || templateStage?.label,
+      phaseKey: sr.phase_key || templateStep?.phaseKey,
+      stepLabel: sr.step_label || templateStep?.label,
     };
   });
 
