@@ -10,14 +10,23 @@ import type { ParsedIntent, ConversationContext } from './types.js';
  * 意图关键词映射
  */
 const INTENT_KEYWORDS: Record<string, { type: ParsedIntent['type']; action: ParsedIntent['action'] }[]> = {
-  // 控制类
-  '暂停': [{ type: 'control', action: 'pause' }],
+  // 控制类（需要流水线/任务前缀）
+  '流水线暂停': [{ type: 'control', action: 'pause' }],
+  '暂停流水线': [{ type: 'control', action: 'pause' }],
+  '暂停任务': [{ type: 'control', action: 'pause' }],
   'pause': [{ type: 'control', action: 'pause' }],
-  '继续': [{ type: 'control', action: 'resume' }],
-  '恢复': [{ type: 'control', action: 'resume' }],
+
+  '流水线继续': [{ type: 'control', action: 'resume' }],
+  '继续流水线': [{ type: 'control', action: 'resume' }],
+  '继续任务': [{ type: 'control', action: 'resume' }],
+  '恢复流水线': [{ type: 'control', action: 'resume' }],
+  '恢复任务': [{ type: 'control', action: 'resume' }],
   'resume': [{ type: 'control', action: 'resume' }],
-  '取消': [{ type: 'control', action: 'cancel' }],
-  '停止': [{ type: 'control', action: 'cancel' }],
+
+  '流水线取消': [{ type: 'control', action: 'cancel' }],
+  '取消流水线': [{ type: 'control', action: 'cancel' }],
+  '取消任务': [{ type: 'control', action: 'cancel' }],
+  '流水线停止': [{ type: 'control', action: 'cancel' }],
   'cancel': [{ type: 'control', action: 'cancel' }],
   'stop': [{ type: 'control', action: 'cancel' }],
 
@@ -27,22 +36,22 @@ const INTENT_KEYWORDS: Record<string, { type: ParsedIntent['type']; action: Pars
   'retry': [{ type: 'control', action: 'retry_from' }],
   '从': [{ type: 'control', action: 'retry_from' }],
 
-  // 审批类
-  '审批通过': [{ type: 'approve', action: 'approve' }],
-  '批准': [{ type: 'approve', action: 'approve' }],
-  '通过': [{ type: 'approve', action: 'approve' }],
-  '可以': [{ type: 'approve', action: 'approve' }],
+  // 审批类（需要流水线前缀）
+  '流水线审批通过': [{ type: 'approve', action: 'approve' }],
+  '流水线通过': [{ type: 'approve', action: 'approve' }],
+  '流水线批准': [{ type: 'approve', action: 'approve' }],
   'approve': [{ type: 'approve', action: 'approve' }],
-  '审批拒绝': [{ type: 'approve', action: 'reject' }],
-  '拒绝': [{ type: 'approve', action: 'reject' }],
-  '不行': [{ type: 'approve', action: 'reject' }],
-  '驳回': [{ type: 'approve', action: 'reject' }],
+
+  '流水线审批拒绝': [{ type: 'approve', action: 'reject' }],
+  '流水线拒绝': [{ type: 'approve', action: 'reject' }],
+  '流水线驳回': [{ type: 'approve', action: 'reject' }],
   'reject': [{ type: 'approve', action: 'reject' }],
 
   // 查询类
-  '进度': [{ type: 'query', action: 'query_progress' }],
-  '状态': [{ type: 'query', action: 'query_status' }],
-  '怎么样': [{ type: 'query', action: 'query_status' }],
+  '流水线进度': [{ type: 'query', action: 'query_progress' }],
+  '任务进度': [{ type: 'query', action: 'query_progress' }],
+  '流水线状态': [{ type: 'query', action: 'query_status' }],
+  '任务状态': [{ type: 'query', action: 'query_status' }],
   'progress': [{ type: 'query', action: 'query_progress' }],
   'status': [{ type: 'query', action: 'query_status' }],
 };
