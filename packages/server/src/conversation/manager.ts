@@ -72,9 +72,20 @@ export class ConversationManager {
     intent: ParsedIntent,
     context: ConversationContext
   ): Promise<ConversationResponse> {
-    // 获取流水线实例
-    const instanceId = intent.instanceId || context.instanceId;
+    // 获取任务 ID（优先使用意图中的）
     const taskId = intent.taskId || context.taskId;
+
+    // 根据任务 ID 获取流水线实例
+    let instanceId = intent.instanceId || context.instanceId;
+    if (!instanceId && taskId) {
+      const instance = queries.getPipelineInstanceByTaskId(taskId);
+      if (instance) {
+        instanceId = instance.id;
+        // 更新上下文
+        context.taskId = taskId;
+        context.instanceId = instanceId;
+      }
+    }
 
     switch (intent.action) {
       case 'pause': {
@@ -375,14 +386,14 @@ export class ConversationManager {
   }
 
   /**
-   * 请求指定流水线
+   * 请求指定任务
    */
   private askForPipeline(): ConversationResponse {
     return {
       success: false,
-      message: '请先指定要操作的流水线',
+      message: '请先指定要操作的任务。\n\n例如：\n• "任务 123 暂停"\n• "任务 1 进度"\n• "#123 继续"',
       needMoreInfo: true,
-      prompt: '请提供任务 ID 或流水线实例 ID',
+      prompt: '请提供任务 ID',
     };
   }
 }

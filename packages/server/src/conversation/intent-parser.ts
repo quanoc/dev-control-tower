@@ -72,20 +72,21 @@ export class IntentParser {
   parse(message: string, context: ConversationContext): ParsedIntent {
     const lowerMessage = message.toLowerCase().trim();
 
-    // 1. 尝试匹配意图关键词
+    // 1. 尝试提取任务 ID
+    const taskId = this.extractTaskId(message);
+
+    // 2. 尝试匹配意图关键词
     const intent = this.matchIntent(lowerMessage);
     if (intent) {
-      // 2. 尝试提取目标步骤
+      // 3. 尝试提取目标步骤
       if (intent.action === 'retry_from') {
         intent.target = this.extractStepKey(message);
       }
 
-      // 3. 从上下文获取实例 ID
+      // 4. 设置任务/实例 ID（优先使用消息中提取的）
+      intent.taskId = taskId ?? context.taskId;
       if (context.instanceId) {
         intent.instanceId = context.instanceId;
-      }
-      if (context.taskId) {
-        intent.taskId = context.taskId;
       }
 
       return intent;
@@ -95,7 +96,33 @@ export class IntentParser {
     return {
       type: 'unknown',
       confidence: 0,
+      taskId,
     };
+  }
+
+  /**
+   * 提取任务 ID
+   * 支持格式：任务 123、任务#123、任务123、task 123
+   */
+  private extractTaskId(message: string): number | undefined {
+    // 模式：任务 + 数字
+    const patterns = [
+      /任务\s*#?\s*(\d+)/i,
+      /task\s*#?\s*(\d+)/i,
+      /#(\d+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = message.match(pattern);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (!isNaN(id) && id > 0) {
+          return id;
+        }
+      }
+    }
+
+    return undefined;
   }
 
   /**
