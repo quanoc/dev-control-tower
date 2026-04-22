@@ -10,7 +10,7 @@ import tasksRouter from './routes/tasks.js';
 import pipelinesRouter from './routes/pipelines.js';
 import chatRouter from './routes/chat.js';
 import { DEFAULT_PIPELINE_PHASES } from '@pipeline/shared';
-import { initializeAgentTags } from './db/agent-sync.js';
+import { initializeAgentTags, readAgentSkills } from './db/agent-sync.js';
 import { pipelineScheduler } from './engine/scheduler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -123,12 +123,8 @@ async function syncAllAgents(): Promise<void> {
         description = `Agent ${agentConfig.name || agentConfig.id}`;
       }
 
-      // Build skills list from openclaw.json skills.entries
-      const skills = Object.entries(skillsEntries).map(([id, entry]: [string, any]) => ({
-        id,
-        name: id,
-        enabled: entry.enabled !== false,
-      }));
+      // Read skills from agent directory instead of openclaw.json
+      const skills = readAgentSkills(agentConfig.agentDir);
 
       // Use type field for persistence
       queries.upsertAgent({

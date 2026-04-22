@@ -6,8 +6,8 @@ import { TaskList } from '../components/TaskList';
 import { NewTaskDialog } from '../components/NewTaskDialog';
 import { Button } from '../components/ui/Button';
 import { SectionHeader } from '../components/ui/SectionHeader';
-import { useAgentStore } from '../store/agents';
-import { useTaskStore } from '../store/tasks';
+import { useAgentSelection } from '../store/agents';
+import { useAgents, useTasks } from '../hooks/useApi';
 import type { PipelineTemplate } from '@pipeline/shared';
 
 interface TasksPageProps {
@@ -15,14 +15,12 @@ interface TasksPageProps {
 }
 
 export function TasksPage({ templates }: TasksPageProps) {
-  const agents = useAgentStore(s => s.agents);
-  const selectedAgentId = useAgentStore(s => s.selectedAgentId);
-  const selectAgent = useAgentStore(s => s.selectAgent);
-  const tasks = useTaskStore(s => s.tasks);
-  const fetchTasks = useTaskStore(s => s.fetchTasks);
+  const { data: agents = [] } = useAgents();
+  const { data: tasks = [], refetch: refetchTasks, isFetching } = useTasks();
+  const selectedAgentId = useAgentSelection(s => s.selectedAgentId);
+  const selectAgent = useAgentSelection(s => s.selectAgent);
 
   const [showNewTask, setShowNewTask] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
@@ -30,12 +28,6 @@ export function TasksPage({ templates }: TasksPageProps) {
   const runningCount = tasks.filter(t => t.status === 'running').length;
   const pendingCount = tasks.filter(t => t.status === 'pending').length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchTasks();
-    setRefreshing(false);
-  };
 
   return (
     <main className="flex-1 flex flex-col">
@@ -76,12 +68,12 @@ export function TasksPage({ templates }: TasksPageProps) {
               <span>队列: <span className="text-amber-600 dark:text-amber-400">{pendingCount}</span></span>
               <span>完成: <span className="text-gray-700 dark:text-gray-300">{completedCount}</span></span>
               <button
-                onClick={handleRefresh}
-                disabled={refreshing}
+                onClick={() => refetchTasks()}
+                disabled={isFetching}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
                 title="刷新"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               </button>
             </span>
           }
@@ -103,10 +95,7 @@ export function TasksPage({ templates }: TasksPageProps) {
         <NewTaskDialog
           templates={templates}
           onClose={() => setShowNewTask(false)}
-          onSuccess={() => {
-            setShowNewTask(false);
-            fetchTasks();
-          }}
+          onSuccess={() => setShowNewTask(false)}
         />
       )}
     </main>

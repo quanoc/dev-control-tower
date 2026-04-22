@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { LayoutDashboard, GitBranch, Bot } from 'lucide-react';
 import { TasksPage } from './pages/TasksPage';
 import { AgentsPage } from './pages/AgentsPage';
@@ -6,20 +6,20 @@ import { ComponentsPage } from './pages/ComponentsPage';
 import { PipelinesPage } from './pages/PipelinesPage';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ChatWidget } from './components/ChatWidget';
-import { useAgentStore } from './store/agents';
-import { useTaskStore } from './store/tasks';
 import { useThemeStore } from './store/theme';
-import { api } from './api/client';
-import type { PipelineTemplate } from '@pipeline/shared';
+import { usePipelineTemplates, useAgents, useTasks } from './hooks/useApi';
 
 type Page = 'tasks' | 'agents' | 'components' | 'pipelines';
 
 function App() {
-  const fetchAgents = useAgentStore(s => s.fetchAgents);
   const theme = useThemeStore(s => s.theme);
 
   const [currentPage, setCurrentPage] = useState<Page>('tasks');
-  const [templates, setTemplates] = useState<PipelineTemplate[]>([]);
+
+  // Prefetch data on mount
+  useAgents();
+  useTasks();
+  const { data: templates = [] } = usePipelineTemplates();
 
   // Sync theme class to document
   useEffect(() => {
@@ -30,24 +30,6 @@ function App() {
       root.classList.remove('dark');
     }
   }, [theme]);
-
-  // Initial load only
-  const loadData = useCallback(async () => {
-    try {
-      await Promise.all([
-        fetchAgents(),
-        useTaskStore.getState().fetchTasks(),
-      ]);
-      const tpl = await api.pipelines.listTemplates();
-      setTemplates(tpl);
-    } catch {
-      // Silently ignore errors
-    }
-  }, [fetchAgents]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">

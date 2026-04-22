@@ -58,6 +58,9 @@ importers:
       '@pipeline/shared':
         specifier: workspace:*
         version: link:../shared
+      '@tanstack/react-query':
+        specifier: ^5.99.2
+        version: 5.99.2(react@19.2.5)
       lucide-react:
         specifier: ^0.460.0
         version: 0.460.0(react@19.2.5)
@@ -668,6 +671,14 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@tanstack/query-core@5.99.2':
+    resolution: {integrity: sha512-1HunU0bXVsR1ZJMZbcOPE6VtaBJxsW809RE9xPe4Gz7MlB0GWwQvuTPhMoEmQ/hIzFKJ/DWAuttIe7BOaWx0tA==}
+
+  '@tanstack/react-query@5.99.2':
+    resolution: {integrity: sha512-vM91UEe45QUS9ED6OklsVL15i8qKcRqNwpWzPTVWvRPRSEgDudDgHpvyTjcdlwHcrKNa80T+xXYcchT2noPnZA==}
+    peerDependencies:
+      react: ^18 || ^19
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -2102,6 +2113,13 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@tanstack/query-core@5.99.2': {}
+
+  '@tanstack/react-query@5.99.2(react@19.2.5)':
+    dependencies:
+      '@tanstack/query-core': 5.99.2
+      react: 19.2.5
 
   '@types/babel__core@7.20.5':
     dependencies:

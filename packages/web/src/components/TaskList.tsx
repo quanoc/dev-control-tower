@@ -5,7 +5,7 @@ import { PipelineFlow } from './PipelineFlow';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { Badge } from './ui/Badge';
-import { useTaskStore } from '../store/tasks';
+import { useTasks, useStartPipeline, useApproveStage, useRetryStage, useSkipStage } from '../hooks/useApi';
 
 type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'cyan' | 'purple' | 'orange' | 'amber';
 
@@ -308,36 +308,24 @@ interface TaskRowProps {
 
 function TaskRow({ task }: TaskRowProps) {
   const [showPipeline, setShowPipeline] = useState(false);
-  const startPipeline = useTaskStore(s => s.startTaskPipeline);
-  const approveTaskStage = useTaskStore(s => s.approveTaskStage);
-  const retryTaskStage = useTaskStore(s => s.retryTaskStage);
-  const skipTaskStage = useTaskStore(s => s.skipTaskStage);
-  const [starting, setStarting] = useState(false);
+  const startPipeline = useStartPipeline();
+  const approveStage = useApproveStage();
+  const retryStage = useRetryStage();
+  const skipStage = useSkipStage();
 
   const pipeline = task.pipeline;
   const config = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.pending;
   const currentStage = getCurrentStage(pipeline);
 
-  const handleStart = async () => {
-    setStarting(true);
-    try {
-      await startPipeline(task.id);
-    } finally {
-      setStarting(false);
-    }
+  const handleStart = () => {
+    startPipeline.mutate(task.id);
   };
 
   const waitingStage = pipeline?.stageRuns?.find(s => s.status === 'waiting_approval');
-  const [approving, setApproving] = useState(false);
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
     if (!waitingStage) return;
-    setApproving(true);
-    try {
-      await approveTaskStage(task.id, waitingStage.id);
-    } finally {
-      setApproving(false);
-    }
+    approveStage.mutate({ taskId: task.id, stageRunId: waitingStage.id });
   };
 
   return (
@@ -420,9 +408,9 @@ function TaskRow({ task }: TaskRowProps) {
                 variant="success"
                 size="sm"
                 onClick={handleStart}
-                disabled={starting || !pipeline}
+                disabled={startPipeline.isPending || !pipeline}
               >
-                {starting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                {startPipeline.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 启动
               </Button>
             )}
@@ -431,9 +419,9 @@ function TaskRow({ task }: TaskRowProps) {
                 variant="warning"
                 size="sm"
                 onClick={handleApprove}
-                disabled={approving}
+                disabled={approveStage.isPending}
               >
-                {approving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                {approveStage.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                 审批
               </Button>
             )}
@@ -467,9 +455,9 @@ function TaskRow({ task }: TaskRowProps) {
         <PipelineModal
           pipeline={pipeline}
           onClose={() => setShowPipeline(false)}
-          onRetry={(stageRunId) => retryTaskStage(task.id, stageRunId)}
-          onSkip={(stageRunId) => skipTaskStage(task.id, stageRunId)}
-          onApprove={(stageRunId) => approveTaskStage(task.id, stageRunId)}
+          onRetry={(stageRunId) => retryStage.mutate({ taskId: task.id, stageRunId })}
+          onSkip={(stageRunId) => skipStage.mutate({ taskId: task.id, stageRunId })}
+          onApprove={(stageRunId) => approveStage.mutate({ taskId: task.id, stageRunId })}
         />
       )}
     </>
@@ -477,10 +465,9 @@ function TaskRow({ task }: TaskRowProps) {
 }
 
 export function TaskList() {
-  const tasks = useTaskStore(s => s.tasks);
-  const loading = useTaskStore(s => s.loading);
+  const { data: tasks = [], isLoading } = useTasks();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-5 h-5 text-gray-400 dark:text-gray-600 animate-spin" />

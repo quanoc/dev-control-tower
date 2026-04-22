@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Trash2, Edit2, X, Grid, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { api } from '../api/client';
-import { useAgentStore } from '../store/agents';
+import { useAgents } from '../hooks/useApi';
 import { Button } from './ui/Button';
 import { SectionHeader } from './ui/SectionHeader';
 
@@ -84,13 +84,7 @@ export function ComponentLibrary({ onBack }: ComponentLibraryProps) {
   const [saving, setSaving] = useState(false);
 
   // Get agents for name lookup
-  const agents = useAgentStore(s => s.agents);
-  const fetchAgents = useAgentStore(s => s.fetchAgents);
-
-  // Fetch agents on mount
-  useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+  const { data: agents = [] } = useAgents();
 
   // Role type abbreviations
   const ROLE_TYPE: Record<string, string> = {

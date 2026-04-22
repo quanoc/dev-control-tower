@@ -5,6 +5,7 @@ import { getDb } from './index.js';
 import type { Agent } from '@pipeline/shared';
 
 const CLAUDE_AGENTS_DIR = join(process.env.HOME || '/root', '.claude', 'agents');
+const CLAUDE_SKILLS_DIR = join(process.env.HOME || '/root', '.claude', 'skills');
 
 // 预定义的标签及其匹配规则
 const TAG_RULES = [
@@ -42,6 +43,79 @@ interface OpenClawAgent {
   model: string;
 }
 
+interface SkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+/**
+ * 读取 Agent 目录下的 skills
+ */
+export function readAgentSkills(agentDir: string, skillsSubDir: string = 'skills'): SkillEntry[] {
+  const skills: SkillEntry[] = [];
+  const skillsDir = skillsSubDir === '.' ? agentDir : join(agentDir, skillsSubDir);
+
+  if (!existsSync(skillsDir)) {
+    return skills;
+  }
+
+  try {
+    const entries = readdirSync(skillsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const skillId = entry.name;
+      const skillMdPath = join(skillsDir, skillId, 'SKILL.md');
+
+      if (!existsSync(skillMdPath)) continue;
+
+      try {
+        const content = readFileSync(skillMdPath, 'utf-8');
+        // 尝试从 YAML frontmatter 解析
+        const yamlMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+        let name = skillId;
+        let description = '';
+
+        if (yamlMatch) {
+          const yamlBlock = yamlMatch[1];
+          const nameMatch = yamlBlock.match(/name:\s*(.+)/);
+          const descMatch = yamlBlock.match(/description:\s*['"]?(.+?)['"]?(?:\n|$)/);
+          if (nameMatch) name = nameMatch[1].trim();
+          if (descMatch) description = descMatch[1].trim();
+        } else {
+          // 从 Markdown 标题解析
+          const lines = content.split('\n').filter(l => l.trim());
+          const titleLine = lines[0] || '';
+          name = titleLine.replace(/^#\s*/, '').trim() || skillId;
+          // 获取第一段作为描述
+          const descLines = lines.slice(1);
+          description = descLines
+            .filter(l => !l.startsWith('#') && !l.startsWith('```'))
+            .slice(0, 2)
+            .join(' ')
+            .trim()
+            .substring(0, 200);
+        }
+
+        skills.push({
+          id: skillId,
+          name: name || skillId,
+          description: description || 'No description',
+          enabled: true,
+        });
+      } catch (err) {
+        console.error(`[AgentSync] Failed to read skill ${skillId} for agent ${agentDir}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`[AgentSync] Failed to read skills dir for agent ${agentDir}:`, err);
+  }
+
+  return skills;
+}
+
 interface ClaudeLocalAgent {
   id: string;
   name: string;
@@ -65,7 +139,14 @@ export function syncAgents(): void {
       encoding: 'utf-8',
       timeout: 30000,
     });
-    const openclawAgents: OpenClawAgent[] = JSON.parse(openclawData);
+    // Extract JSON from output (filter out plugin logs mixed with JSON)
+    const lines = openclawData.split('\n');
+    const logPrefixes = ['[plugins]', '[warning]', '[error]', '[info]', '[cli]', '[config]'];
+    const isLogLine = (l: string) => logPrefixes.some(p => l.trim().startsWith(p));
+    const startIdx = lines.findIndex(l => !isLogLine(l) && (l.trim().startsWith('[') || l.trim().startsWith('{')));
+    const endIdx = lines.length - 1 - [...lines].reverse().findIndex(l => !isLogLine(l) && (l.trim().endsWith(']') || l.trim().endsWith('}')));
+    const jsonStr = lines.slice(startIdx, endIdx + 1).join('\n');
+    const openclawAgents: OpenClawAgent[] = JSON.parse(jsonStr);
 
     for (const agent of openclawAgents) {
       // Read IDENTITY.md for description and emoji
@@ -101,14 +182,20 @@ export function syncAgents(): void {
         ? join(process.env.HOME || '/root', '.openclaw', 'workspace')
         : agent.workspace || agent.agentDir;
 
+      // 读取该 Agent 的 skills
+      // main agent 从 workspace 读取 skills，其他 agent 从 agentDir 读取
+      const skillsDir = agent.id === 'main' ? workspace : agent.agentDir;
+      const skills = readAgentSkills(skillsDir);
+
       db.prepare(`
-        INSERT INTO agents (id, name, type, role, emoji, description, path, metadata, last_sync, updated_at, tags)
-        VALUES (?, ?, 'openclaw', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        INSERT INTO agents (id, name, type, role, emoji, description, path, skills, metadata, last_sync, updated_at, tags)
+        VALUES (?, ?, 'openclaw', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           emoji = COALESCE(NULLIF(excluded.emoji, ''), agents.emoji),
           description = excluded.description,
           path = excluded.path,
+          skills = excluded.skills,
           metadata = excluded.metadata,
           last_sync = excluded.last_sync,
           type = 'openclaw',
@@ -121,6 +208,7 @@ export function syncAgents(): void {
         emoji || '🤖',
         description,
         workspace, // Use agentDir (not workspace) for IDENTITY.md
+        JSON.stringify(skills),
         JSON.stringify({ model: agent.model }),
         now,
         JSON.stringify(tags)
@@ -136,6 +224,11 @@ export function syncAgents(): void {
     if (existsSync(CLAUDE_AGENTS_DIR)) {
       const files = readdirSync(CLAUDE_AGENTS_DIR).filter(f => f.endsWith('.md'));
       let syncedCount = 0;
+
+      // Read user-defined skills from ~/.claude/skills (if exists)
+      const defaultSkills = existsSync(CLAUDE_SKILLS_DIR)
+        ? readAgentSkills(CLAUDE_SKILLS_DIR, '.')
+        : [];
 
       for (const file of files) {
         try {
@@ -167,12 +260,13 @@ export function syncAgents(): void {
           const tags = inferAgentTags(agentId, name, name, description);
 
           db.prepare(`
-            INSERT INTO agents (id, name, type, role, description, metadata, last_sync, updated_at, tags)
-            VALUES (?, ?, 'claude', ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            INSERT INTO agents (id, name, type, role, description, metadata, skills, last_sync, updated_at, tags)
+            VALUES (?, ?, 'claude', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             ON CONFLICT(id) DO UPDATE SET
               name = excluded.name,
               description = COALESCE(excluded.description, agents.description),
               metadata = excluded.metadata,
+              skills = excluded.skills,
               last_sync = excluded.last_sync,
               type = 'claude',
               updated_at = CURRENT_TIMESTAMP,
@@ -183,6 +277,7 @@ export function syncAgents(): void {
             name, // role (use name as default)
             description,
             JSON.stringify({ model, tools }),
+            JSON.stringify(defaultSkills),
             now,
             JSON.stringify(tags)
           );

@@ -1,11 +1,88 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Agent } from '@pipeline/shared';
 
-// Common skill search paths
-const SKILL_SEARCH_PATHS = [
+const CLAUDE_SKILLS_DIR = join(process.env.HOME || '/root', '.claude', 'skills');
+
+// OpenClaw skill search paths
+const OPENCLAW_SKILL_SEARCH_PATHS = [
   '/root/.openclaw/skills',
   '/root/.openclaw/extensions',
 ];
+
+/**
+ * Get full SKILL.md content for a specific agent's skill.
+ */
+export function getSkillContent(agent: Agent, skillId: string): { id: string; name: string; content: string; path: string } | null {
+  // Determine skill directory based on agent source
+  if (agent.source === 'claude') {
+    // Claude agents: ~/.claude/skills/{skillId}
+    const skillDir = join(CLAUDE_SKILLS_DIR, skillId);
+    return readSkillFile(skillId, skillDir);
+  } else if (agent.source === 'openclaw') {
+    // OpenClaw agents: search in workspace/agentDir
+    const searchPaths = [
+      join(agent.workspace || '', 'skills', skillId),
+      join(agent.agentDir || '', 'skills', skillId),
+    ];
+    for (const skillDir of searchPaths) {
+      const result = readSkillFile(skillId, skillDir);
+      if (result) return result;
+    }
+    // Also search global OpenClaw paths
+    for (const basePath of OPENCLAW_SKILL_SEARCH_PATHS) {
+      const result = searchSkillInBase(skillId, basePath);
+      if (result) return result;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Read SKILL.md from a specific directory.
+ */
+function readSkillFile(skillId: string, skillDir: string): { id: string; name: string; content: string; path: string } | null {
+  const skillMdPath = join(skillDir, 'SKILL.md');
+  if (!existsSync(skillMdPath)) return null;
+
+  try {
+    const content = readFileSync(skillMdPath, 'utf-8');
+    const { name } = parseSkillMarkdown(skillId, content);
+    return { id: skillId, name, content, path: skillMdPath };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Search for skill in a base path (direct or nested).
+ */
+function searchSkillInBase(skillId: string, basePath: string): { id: string; name: string; content: string; path: string } | null {
+  if (!existsSync(basePath)) return null;
+
+  // Direct: basePath/{skillId}
+  const direct = readSkillFile(skillId, join(basePath, skillId));
+  if (direct) return direct;
+
+  // Nested: basePath/*/skills/{skillId} or basePath/*/node_modules/openclaw/skills/{skillId}
+  try {
+    const entries = readdirSync(basePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const nested = readSkillFile(skillId, join(basePath, entry.name, 'skills', skillId));
+      if (nested) return nested;
+
+      const nm = readSkillFile(skillId, join(basePath, entry.name, 'node_modules', 'openclaw', 'skills', skillId));
+      if (nm) return nm;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
 
 /**
  * Find and read a skill's SKILL.md file.
@@ -30,7 +107,13 @@ export async function getSkillDescription(skillId: string): Promise<{ id: string
  * Search for a skill directory across known paths.
  */
 function findSkillDir(skillId: string): string | null {
-  for (const basePath of SKILL_SEARCH_PATHS) {
+  // Also check Claude skills dir
+  const claudePath = join(CLAUDE_SKILLS_DIR, skillId);
+  if (existsSync(claudePath) && existsSync(join(claudePath, 'SKILL.md'))) {
+    return claudePath;
+  }
+
+  for (const basePath of OPENCLAW_SKILL_SEARCH_PATHS) {
     if (!existsSync(basePath)) continue;
 
     // Direct child: /root/.openclaw/skills/{skillId}

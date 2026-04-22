@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { Input, TextArea, FormField } from './ui/Input';
-import { useTaskStore } from '../store/tasks';
+import { useCreateTask } from '../hooks/useApi';
 import type { PipelineTemplate } from '@pipeline/shared';
 
 interface NewTaskDialogProps {
@@ -18,22 +18,16 @@ export function NewTaskDialog({ templates, onClose, onSuccess }: NewTaskDialogPr
   const [selectedTemplate, setSelectedTemplate] = useState<number | undefined>(
     templates.length > 0 ? templates[0].id : undefined
   );
-  const [saving, setSaving] = useState(false);
-  const createTask = useTaskStore(s => s.createTask);
+  const createTask = useCreateTask();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || saving) return;
+    if (!title.trim() || createTask.isPending) return;
 
-    setSaving(true);
-    try {
-      await createTask(title.trim(), description.trim(), selectedTemplate);
-      onSuccess();
-    } catch (err) {
-      console.error('Failed to create task:', err);
-    } finally {
-      setSaving(false);
-    }
+    createTask.mutate(
+      { title: title.trim(), description: description.trim(), templateId: selectedTemplate },
+      { onSuccess }
+    );
   };
 
   return (
@@ -46,9 +40,9 @@ export function NewTaskDialog({ templates, onClose, onSuccess }: NewTaskDialogPr
           <Button type="button" variant="ghost" onClick={onClose}>
             取消
           </Button>
-          <Button type="submit" form="new-task-form" disabled={!title.trim() || saving}>
+          <Button type="submit" form="new-task-form" disabled={!title.trim() || createTask.isPending}>
             <Plus className="w-4 h-4" />
-            {saving ? '创建中...' : '创建需求'}
+            {createTask.isPending ? '创建中...' : '创建需求'}
           </Button>
         </>
       }

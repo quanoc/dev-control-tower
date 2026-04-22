@@ -1,14 +1,56 @@
 import type { Agent } from '@pipeline/shared';
-import { X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { X, ChevronDown, ChevronRight, Search, FileText } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { api } from '../api/client';
+import { Modal } from './ui/Modal';
 
 interface AgentDrawerProps {
   agent: Agent;
   onClose: () => void;
 }
 
+interface SkillContent {
+  id: string;
+  name: string;
+  content: string;
+  path: string;
+}
+
 export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
   const [showDisabledSkills, setShowDisabledSkills] = useState(false);
+  const [skillsExpanded, setSkillsExpanded] = useState(true);
+  const [skillSearch, setSkillSearch] = useState('');
+  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const [skillContent, setSkillContent] = useState<SkillContent | null>(null);
+  const [loadingSkill, setLoadingSkill] = useState(false);
+
+  // Fetch skill content when selected
+  useEffect(() => {
+    if (!selectedSkill) {
+      setSkillContent(null);
+      return;
+    }
+    setLoadingSkill(true);
+    api.agents.getSkillContent(agent.id, selectedSkill)
+      .then(data => setSkillContent(data))
+      .catch(() => setSkillContent(null))
+      .finally(() => setLoadingSkill(false));
+  }, [agent.id, selectedSkill]);
+
+  // Filter skills based on search
+  const filteredSkills = useMemo(() => {
+    const skills = showDisabledSkills ? agent.skills : agent.skills.filter(s => s.enabled);
+    if (!skillSearch.trim()) return skills;
+    const search = skillSearch.toLowerCase();
+    return skills.filter(s =>
+      s.name.toLowerCase().includes(search) ||
+      s.id.toLowerCase().includes(search) ||
+      s.description?.toLowerCase().includes(search)
+    );
+  }, [agent.skills, showDisabledSkills, skillSearch]);
+
+  const enabledCount = agent.skills.filter(s => s.enabled).length;
+  const totalCount = agent.skills.length;
 
   return (
     <>
@@ -60,33 +102,78 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
             {/* Skills */}
             {agent.skills && agent.skills.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider">Skills</h4>
-                  {agent.skills.some(s => !s.enabled) && (
-                    <button
-                      onClick={() => setShowDisabledSkills(!showDisabledSkills)}
-                      className="text-xs text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400"
-                    >
-                      {showDisabledSkills ? '隐藏未启用' : '显示未启用'}
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(showDisabledSkills ? agent.skills : agent.skills.filter(s => s.enabled)).map(skill => (
-                    <span
-                      key={skill.id}
-                      className={`
-                        inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
-                        ${skill.enabled
-                          ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-gray-200 dark:border-gray-700'
-                        }
-                      `}
-                    >
-                      {skill.enabled ? '✓' : '✗'} {skill.name}
+                <button
+                  onClick={() => setSkillsExpanded(!skillsExpanded)}
+                  className="flex items-center justify-between w-full mb-2 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider">
+                      Skills
+                    </h4>
+                    <span className="text-xs text-gray-400 dark:text-gray-600">
+                      ({enabledCount}/{totalCount} 启用)
                     </span>
-                  ))}
-                </div>
+                  </div>
+                  <span className="text-gray-400 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text-gray-400">
+                    {skillsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </span>
+                </button>
+
+                {skillsExpanded && (
+                  <>
+                    {/* Search input */}
+                    {totalCount > 10 && (
+                      <div className="relative mb-2">
+                        <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600" />
+                        <input
+                          type="text"
+                          value={skillSearch}
+                          onChange={e => setSkillSearch(e.target.value)}
+                          placeholder="搜索 skills..."
+                          className="w-full pl-7 pr-2 py-1 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                        />
+                      </div>
+                    )}
+
+                    {/* Toggle disabled skills */}
+                    {agent.skills.some(s => !s.enabled) && (
+                      <button
+                        onClick={() => setShowDisabledSkills(!showDisabledSkills)}
+                        className="text-xs text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 mb-2"
+                      >
+                        {showDisabledSkills ? '仅显示已启用' : '显示全部'}
+                      </button>
+                    )}
+
+                    {/* Skills list */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {filteredSkills.map(skill => (
+                        <button
+                          key={skill.id}
+                          onClick={() => setSelectedSkill(skill.id)}
+                          title={skill.description}
+                          className={`
+                            inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium cursor-pointer hover:shadow-sm transition-shadow
+                            ${skill.enabled
+                              ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-200 dark:hover:bg-emerald-500/20'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }
+                          `}
+                        >
+                          <FileText className="w-3 h-3" />
+                          {skill.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Search result count */}
+                    {skillSearch.trim() && filteredSkills.length !== (showDisabledSkills ? totalCount : enabledCount) && (
+                      <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">
+                        找到 {filteredSkills.length} 个匹配
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -103,6 +190,34 @@ export function AgentDrawer({ agent, onClose }: AgentDrawerProps) {
           </div>
         </div>
       </div>
+
+      {/* Skill Content Modal */}
+      <Modal
+        open={selectedSkill !== null}
+        onClose={() => setSelectedSkill(null)}
+        title={skillContent?.name || selectedSkill || 'Skill'}
+        size="lg"
+      >
+        {loadingSkill ? (
+          <div className="flex items-center gap-2 text-gray-500 py-8 justify-center">
+            <div className="w-4 h-4 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+            加载中...
+          </div>
+        ) : skillContent ? (
+          <div className="p-4">
+            <div className="mb-3 text-xs text-gray-500 dark:text-gray-500 font-mono">
+              {skillContent.path}
+            </div>
+            <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed bg-gray-50 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto max-h-[50vh] overflow-y-auto">
+              {skillContent.content}
+            </pre>
+          </div>
+        ) : (
+          <div className="p-4 text-gray-500 text-center">
+            无法加载 skill 内容
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

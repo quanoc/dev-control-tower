@@ -4,7 +4,7 @@
  * Parses agent output as JSON. If parsing fails, returns raw output as fallback.
  */
 
-import type { StepOutput, ParsedOutput, NextStepInput } from './types';
+import type { StepOutput, ParsedOutput, NextStepInput } from './types.js';
 import type { Artifact, ArtifactType } from '../executors/interface';
 
 /**

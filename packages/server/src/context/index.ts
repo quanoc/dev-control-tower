@@ -4,9 +4,9 @@
  * Exports all context-related classes and types.
  */
 
-export * from './types';
-export { ContextBuilder } from './context-builder';
-export { PromptGenerator } from './prompt-generator';
-export { OutputParser } from './output-parser';
-export { OutputValidator } from './output-validator';
-export type { ValidationError } from './output-validator';
+export * from './types.js';
+export { ContextBuilder } from './context-builder.js';
+export { PromptGenerator } from './prompt-generator.js';
+export { OutputParser } from './output-parser.js';
+export { OutputValidator } from './output-validator.js';
+export type { ValidationError } from './output-validator.js';

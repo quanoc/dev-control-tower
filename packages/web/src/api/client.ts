@@ -42,6 +42,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ message }),
       }),
+    getSkillContent: (agentId: string, skillId: string) =>
+      request<{ id: string; name: string; content: string; path: string }>(`/agents/${agentId}/skills/${skillId}/content`),
   },
 
   // Tasks

@@ -2,7 +2,7 @@ import { Router, type Router as RouterType } from 'express';
 import * as queries from '../db/queries.js';
 import { OpenClawAgentClient } from '../openclaw/agent.js';
 import { ClaudeAgentClient } from '../openclaw/claude-agent.js';
-import { getSkillDescription } from '../openclaw/skills.js';
+import { getSkillDescription, getSkillContent } from '../openclaw/skills.js';
 import { syncAgents } from '../db/agent-sync.js';
 
 const router: RouterType = Router();
@@ -146,6 +146,17 @@ router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM agents WHERE id = ?').run(id);
 
   res.status(204).send();
+});
+
+// GET /api/agents/:agentId/skills/:skillId/content - Get skill full content (must be before /:id)
+router.get('/:agentId/skills/:skillId/content', (req, res) => {
+  const agent = queries.getAgentById(req.params.agentId);
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+  const result = getSkillContent(agent, req.params.skillId);
+  if (!result) return res.status(404).json({ error: `Skill "${req.params.skillId}" not found` });
+
+  res.json(result);
 });
 
 // GET /api/agents/:id - Get agent details

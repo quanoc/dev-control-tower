@@ -51,6 +51,7 @@ export interface Agent {
 export interface SkillEntry {
   id: string;
   name: string;
+  description?: string;
   enabled: boolean;
 }
 
