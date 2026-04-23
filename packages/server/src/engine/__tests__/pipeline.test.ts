@@ -402,5 +402,33 @@ describe('PipelineExecutor', () => {
       // Verify the transition was called (state machine will validate)
       expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
     });
+
+    it('should reset waiting_approval stage to pending', async () => {
+      // 场景：人工评审在等待审批，用户想重新执行该阶段
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'paused',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'stage_1' },
+          { id: 2, status: 'waiting_approval', stageKey: 'stage_2' },  // 等待审批中
+        ],
+      } as any);
+      vi.mocked(queries.getTaskById).mockReturnValue({ id: 1, status: 'paused' } as any);
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'stage_2',
+      } as any);
+
+      (queries as any).getDb = () => ({
+        prepare: () => ({ run: vi.fn() }),
+      });
+
+      // 应该可以重置 waiting_approval 状态
+      await executor.retryFrom(1, 'stage_2');
+
+      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
+    });
   });
 });

@@ -250,6 +250,10 @@ export interface PipelineStep {
   actorType: ActorType;
   action: AgentActionType | HumanGateType | SystemFlowType;
   agentId?: string;
+  /** Skill to use for this step (from agent's skills or shared skills) */
+  skillId?: string;
+  /** Multiple skills to use */
+  skillIds?: string[];
   humanRole?: string;
   optional: boolean;
   icon: string;
@@ -689,10 +693,10 @@ export const PIPELINE_TRANSITIONS: Record<PipelineInstanceStatus, PipelineInstan
 };
 
 export const STAGE_TRANSITIONS: Record<StageRunStatus, StageRunStatus[]> = {
-  pending:        ['running', 'skipped'],
-  running:        ['completed', 'failed', 'waiting_approval'],
-  waiting_approval: ['completed', 'failed'],
-  completed:      [],
-  failed:         ['pending'],
-  skipped:        [],
+  pending:          ['running', 'skipped'],
+  running:          ['completed', 'failed', 'waiting_approval'],
+  waiting_approval: ['completed', 'failed', 'pending'],  // 允许 retryFrom 重置
+  completed:        ['pending'],  // 允许 retryFrom 重置
+  failed:           ['pending'],
+  skipped:          [],
 };
