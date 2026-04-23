@@ -5,16 +5,25 @@ import type { ExecutionContext, ExecutionResult, Artifact } from '../executors/i
 import type { PipelineInstance, StageRun, Agent } from '@pipeline/shared';
 import { PHASES, flattenPhases } from '@pipeline/shared';
 
-// Mock 模式配置：可通过环境变量控制
-const MOCK_MODE = process.env.PIPELINE_MOCK_MODE !== 'false';
+// Mock 模式配置：默认关闭，设置 PIPELINE_MOCK_MODE=true 开启
+const MOCK_MODE = process.env.PIPELINE_MOCK_MODE === 'true';
 
 /**
  * 流水线执行器
  *
- * 设计原则：
- * 1. 状态完全存储在数据库，不依赖内存
- * 2. 幂等执行：同一阶段不会被重复执行
- * 3. 事件驱动：阶段完成后自动推进下一阶段
+ * 核心原则（必须遵守）：
+ * 1. **Batch 执行模型**：
+ *    - Batch 内并行：同一个 batch 内的 steps 可以并行执行
+ *    - Batch 间串行：不同 batch 必须串行，当前 batch 全部完成后才能进入下一个
+ *    - 配置：batches: [2, 1, 3] 表示 2个并行 → 1个串行 → 3个并行
+ *    - 默认全串行：[1, 1, 1, ...]
+ * 2. **幂等执行**：同一阶段不会被重复执行，只执行 pending 状态的阶段
+ * 3. **事件驱动**：batch 全部完成 → 自动推进下一个 batch
+ * 4. **状态机约束**：状态变更必须通过 stateMachine.transition()，不直接改数据库
+ * 5. **Scheduler 守护**：Scheduler 只恢复"卡住"的流水线，当前 batch 有 running 则跳过
+ *
+ * 执行链：
+ * start() → executeNextBatch() → 并行执行 batch 内 steps → batch 完成 → executeNextBatch()
  */
 export class PipelineExecutor {
   /**
@@ -50,16 +59,17 @@ export class PipelineExecutor {
       return;
     }
 
-    // 找到下一个待执行的阶段
+    // 【关键】先检查是否有正在运行的阶段
+    // 如果有 running，必须等待它完成，不能启动新的阶段
+    const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
+    if (runningStage) {
+      console.log(`[Executor] Pipeline ${instanceId} has running stage: ${runningStage.stageKey}, waiting...`);
+      return;
+    }
+
+    // 没有正在运行的阶段，找下一个 pending
     const pendingStage = instance.stageRuns.find(sr => sr.status === 'pending');
     if (!pendingStage) {
-      // 检查是否有正在运行的阶段
-      const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
-      if (runningStage) {
-        console.log(`[Executor] Pipeline ${instanceId} has running stage: ${runningStage.stageKey}`);
-        return;
-      }
-
       // 检查是否全部完成
       const allCompleted = instance.stageRuns.every(
         sr => sr.status === 'completed' || sr.status === 'skipped'
@@ -406,9 +416,11 @@ export class PipelineExecutor {
       throw new Error(`Stage "${stageKey}" not found in pipeline`);
     }
 
-    // 该 step 及后续所有步骤状态改为 pending
+    // 该 step 及后续所有步骤状态改为 pending，并清理输出
     for (let i = targetIndex; i < instance.stageRuns.length; i++) {
       const stage = instance.stageRuns[i];
+      // 清理旧的输出数据
+      queries.clearStageRunOutput(stage.id);
       // 只重置非 pending 的步骤
       if (stage.status !== 'pending') {
         await stateMachine.transition('stage', stage.id, 'pending', 'human');
