@@ -87,6 +87,26 @@ pnpm build
 - 关联 Pipeline Instance
 - 状态：pending → running → completed/failed
 
+## 流水线执行核心原则
+
+**必须遵守**，任何修改都不能违反这些原则：
+
+1. **Batch 执行模型**：
+   - **Batch 内并行**：同一个 batch 内的 steps 可以并行执行
+   - **Batch 间串行**：不同 batch 必须串行，当前 batch 全部完成后才能进入下一个
+   - 配置：`batches: [2, 1, 3]` 表示 2个并行 → 1个串行 → 3个并行
+   - 默认全串行：`[1, 1, 1, ...]`
+
+2. **幂等执行**：同一阶段不会重复执行，只执行 `pending` 状态的阶段。
+
+3. **事件驱动**：batch 全部完成 → 自动推进下一个 batch。
+
+4. **状态机约束**：状态变更必须通过 `stateMachine.transition()`，不直接改数据库。
+
+5. **Scheduler 守护**：Scheduler 只恢复"卡住"的流水线。当前 batch 有 `running` 则跳过。
+
+**执行链**：`start() → executeNextBatch() → 并行执行 batch 内 steps → batch 完成 → executeNextBatch()`
+
 ## Agent 工作流
 
 1. **Plan** - 使用 planner agent 规划

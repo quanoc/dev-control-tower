@@ -1,5 +1,5 @@
 import type { Task, StageRun, PipelineInstance, Artifact, ArtifactType } from '@pipeline/shared';
-import { Play, Loader2, Eye, GitBranch } from 'lucide-react';
+import { Play, Loader2, Eye, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { PipelineFlow } from './PipelineFlow';
 import { Button } from './ui/Button';
@@ -72,6 +72,49 @@ const STAGE_STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }>
   waiting_approval: { label: '待审批', variant: 'warning' },
 };
 
+/**
+ * 输出单元格组件 - 支持展开/收起
+ */
+function OutputCell({ output }: { output: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = output.length > 50;
+
+  if (!isLong) {
+    return (
+      <span className="text-xs text-gray-600 dark:text-gray-400 truncate block" title={output}>
+        {output}
+      </span>
+    );
+  }
+
+  return (
+    <div className="w-full min-w-0">
+      {expanded ? (
+        <div className="space-y-1">
+          <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-800/50 p-2 rounded max-h-[120px] overflow-y-auto">
+            {output}
+          </pre>
+          <button
+            onClick={() => setExpanded(false)}
+            className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+          >
+            <ChevronUp className="w-3 h-3" />
+            收起
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 text-left w-full"
+        >
+          <span className="truncate flex-1 min-w-0">{output}</span>
+          <ChevronDown className="w-3 h-3 flex-shrink-0" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface PipelineModalProps {
   pipeline: PipelineInstance;
   onClose: () => void;
@@ -135,7 +178,7 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
         <div>
           <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3">阶段详情</h4>
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-            <table className="w-full text-xs whitespace-nowrap">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-8">#</th>
@@ -144,7 +187,7 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-24">执行者</th>
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-20">状态</th>
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-16">耗时</th>
-                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium">输出</th>
+                  <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-[35%]">输出</th>
                   <th className="text-left px-3 py-2.5 text-gray-500 dark:text-gray-500 font-medium w-24">产物</th>
                 </tr>
               </thead>
@@ -165,13 +208,13 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
 
                   return (
                     <tr key={stage.id} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
-                      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-600 font-mono">{i + 1}</td>
+                      <td className="px-3 py-2.5 text-gray-400 dark:text-gray-600 font-mono whitespace-nowrap">{i + 1}</td>
 
                       {/* 阶段单元格 - 只在起始行渲染，合并 rowspan */}
                       {group ? (
                         <td
                           rowSpan={group.count}
-                          className="px-3 py-2.5 text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-medium align-top"
+                          className="px-3 py-2.5 text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-medium align-top whitespace-nowrap"
                         >
                           <div className="flex flex-col gap-1">
                             <span>{group.label}</span>
@@ -182,13 +225,13 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
                         </td>
                       ) : null}
 
-                      <td className="px-3 py-2.5 text-gray-800 dark:text-gray-300">{stepLabel}</td>
-                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono text-[10px]">{stage.agentId || '—'}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 text-gray-800 dark:text-gray-300 whitespace-nowrap">{stepLabel}</td>
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono text-[10px] whitespace-nowrap">{stage.agentId || '—'}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
-                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono">{duration}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">{duration}</td>
+                      <td className="px-3 py-2.5 max-w-0">
                         {stage.status === 'waiting_approval' && onApprove ? (
                           <button
                             onClick={() => onApprove(stage.id)}
@@ -219,14 +262,12 @@ function PipelineModal({ pipeline, onClose, onRetry, onSkip, onApprove }: Pipeli
                             )}
                           </div>
                         ) : stage.output ? (
-                          <span className="text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={stage.output}>
-                            {stage.output.substring(0, 40)}...
-                          </span>
+                          <OutputCell output={stage.output} />
                         ) : (
                           <span className="text-gray-300 dark:text-gray-700">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                         {stage.artifacts && stage.artifacts.length > 0 ? (
                           <div className="flex flex-col gap-0.5">
                             {stage.artifacts.map((artifact, idx) => (

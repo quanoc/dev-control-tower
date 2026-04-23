@@ -180,6 +180,31 @@ stateDiagram-v2
 - **Scheduler**: 任务调度与资源分配
 - **StateMachine**: 流水线状态流转控制
 
+**核心执行原则**（必须遵守）：
+
+1. **Batch 执行模型**：
+   - **Batch 内并行**：同一个 batch 内的 steps 可以并行执行
+   - **Batch 间串行**：不同 batch 必须串行，当前 batch 全部完成后才能进入下一个 batch
+   - 配置示例：`batches: [2, 1, 3]` 表示 2个并行 → 1个串行 → 3个并行
+   - 默认全串行：`[1, 1, 1, ...]`
+
+2. **幂等执行**：同一阶段不会被重复执行。`executeStage()` 会先检查状态，只执行 `pending` 状态的阶段。
+
+3. **事件驱动推进**：当前 batch 全部完成后自动触发下一个 batch。`handleStageSuccess()` 检查 batch 完成状态后调用 `executeNextBatch()`。
+
+4. **状态机约束**：所有状态变更必须通过 `stateMachine.transition()` 验证，不直接修改数据库状态。
+
+5. **Scheduler 守护原则**：Scheduler 只负责恢复"卡住"的流水线。如果当前 batch 有 `running` 阶段，必须跳过，等待其完成。
+
+**执行流程**：
+```
+start() → executeNextBatch() → 找到当前 batch 的 pending steps
+                                    ↓
+                              并行执行 steps (Promise.all)
+                                    ↓
+                              batch 全部完成 → executeNextBatch()
+```
+
 #### 执行器 (executors/)
 工作流阶段：
 1. **Plan** → 需求分析与任务规划
