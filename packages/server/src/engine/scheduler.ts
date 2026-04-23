@@ -98,9 +98,10 @@ export class PipelineScheduler {
       const pendingStage = instance.stageRuns.find(sr => sr.status === 'pending');
 
       if (pendingStage) {
-        console.log(`[Scheduler] Recovering pipeline ${instance.id}, executing stage ${pendingStage.stageKey}`);
+        console.log(`[Scheduler] Recovering pipeline ${instance.id}, has pending stage ${pendingStage.stageKey}`);
         try {
-          await pipelineExecutor.executeStage(instance.id, pendingStage.id);
+          // Scheduler 只恢复流水线级别的执行，具体的 step 调度由 executeNextStage 管理
+          await pipelineExecutor.executeNextStage(instance.id);
         } catch (err) {
           console.error(`[Scheduler] Failed to recover pipeline ${instance.id}:`, err);
         }
