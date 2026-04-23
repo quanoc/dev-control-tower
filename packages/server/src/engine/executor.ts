@@ -99,9 +99,16 @@ export class PipelineExecutor {
       return;
     }
 
+    // 【关键】检查流水线是否有其他 running 阶段
+    // 这是为了防止 Scheduler 或其他调用者绕过 executeNextStage 的检查
     const instance = queries.getPipelineInstanceById(instanceId);
     if (!instance) {
       throw new Error(`Pipeline instance ${instanceId} not found`);
+    }
+    const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
+    if (runningStage) {
+      console.log(`[Executor] Pipeline ${instanceId} has running stage: ${runningStage.stageKey}, cannot start stage ${stageRun.stageKey}`);
+      return;
     }
 
     // 获取阶段元信息
