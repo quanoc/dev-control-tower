@@ -695,8 +695,8 @@ export const PIPELINE_TRANSITIONS: Record<PipelineInstanceStatus, PipelineInstan
 export const STAGE_TRANSITIONS: Record<StageRunStatus, StageRunStatus[]> = {
   pending:          ['running', 'skipped'],
   running:          ['completed', 'failed', 'waiting_approval'],
-  waiting_approval: ['completed', 'failed', 'pending'],  // 允许 retryFrom 重置
-  completed:        ['pending'],  // 允许 retryFrom 重置
-  failed:           ['pending'],
+  waiting_approval: ['completed', 'failed'],  // 自动执行只能到 completed 或 failed
+  completed:        [],  // 自动执行不能改变已完成状态
+  failed:           ['pending'],  // 失败可以重试
   skipped:          [],
 };

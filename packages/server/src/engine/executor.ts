@@ -424,13 +424,16 @@ export class PipelineExecutor {
     }
 
     // 该 step 及后续所有步骤状态改为 pending，并清理输出
+    // 注意：retryFrom 是手动干预，直接更新数据库状态，不走状态机验证
     for (let i = targetIndex; i < instance.stageRuns.length; i++) {
       const stage = instance.stageRuns[i];
       // 清理旧的输出数据
       queries.clearStageRunOutput(stage.id);
-      // 只重置非 pending 的步骤
+      // 只重置非 pending 的步骤（直接更新，绕过状态机）
       if (stage.status !== 'pending') {
-        await stateMachine.transition('stage', stage.id, 'pending', 'human');
+        queries.updateStageRunStatus(stage.id, 'pending');
+        queries.logStateTransition('stage', stage.id, stage.status, 'pending', 'human');
+        console.log(`[Executor] Reset stage ${stage.id} from ${stage.status} to pending (manual intervention)`);
       }
     }
 

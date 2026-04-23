@@ -315,10 +315,11 @@ describe('PipelineExecutor', () => {
       expect(queries.clearStageRunOutput).toHaveBeenCalledWith(3);
       expect(queries.clearStageRunOutput).toHaveBeenCalledWith(4);
 
-      // Should transition stages 2 and 3 to pending (stage 4 is already pending)
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 3, 'pending', 'human');
-      expect(stateMachine.transition).not.toHaveBeenCalledWith('stage', 4, 'pending', 'human');
+      // retryFrom 是手动干预，直接更新数据库状态，不走状态机
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(2, 'pending');
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(3, 'pending');
+      expect(queries.logStateTransition).toHaveBeenCalledWith('stage', 2, 'completed', 'pending', 'human');
+      expect(queries.logStateTransition).toHaveBeenCalledWith('stage', 3, 'completed', 'pending', 'human');
     });
 
     it('should transition pipeline to running if not already', async () => {
@@ -375,7 +376,7 @@ describe('PipelineExecutor', () => {
     });
 
     it('should handle completed stage transition to pending', async () => {
-      // This test verifies that STAGE_TRANSITIONS allows completed -> pending
+      // retryFrom 是手动干预，直接更新数据库状态，绕过状态机
       vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
         id: 1,
         status: 'paused',
@@ -396,11 +397,12 @@ describe('PipelineExecutor', () => {
         prepare: () => ({ run: vi.fn() }),
       });
 
-      // This should NOT throw - completed -> pending is allowed via retryFrom
+      // completed -> pending 通过 retryFrom 是允许的（手动干预，绕过状态机）
       await executor.retryFrom(1, 'stage_2');
 
-      // Verify the transition was called (state machine will validate)
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
+      // 直接更新数据库状态，不走状态机
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(2, 'pending');
+      expect(queries.logStateTransition).toHaveBeenCalledWith('stage', 2, 'completed', 'pending', 'human');
     });
 
     it('should reset waiting_approval stage to pending', async () => {
@@ -425,10 +427,12 @@ describe('PipelineExecutor', () => {
         prepare: () => ({ run: vi.fn() }),
       });
 
-      // 应该可以重置 waiting_approval 状态
+      // waiting_approval -> pending 通过 retryFrom 是允许的（手动干预，绕过状态机）
       await executor.retryFrom(1, 'stage_2');
 
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
+      // 直接更新数据库状态，不走状态机
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(2, 'pending');
+      expect(queries.logStateTransition).toHaveBeenCalledWith('stage', 2, 'waiting_approval', 'pending', 'human');
     });
   });
 });
