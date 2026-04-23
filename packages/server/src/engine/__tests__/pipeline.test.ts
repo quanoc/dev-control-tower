@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the queries module
 vi.mock('../../db/queries.js', () => ({
-  getDb: () => ({
-    prepare: () => ({
-      run: vi.fn(),
+  getDb: vi.fn().mockReturnValue({
+    prepare: vi.fn().mockReturnValue({
+      run: vi.fn().mockReturnValue({ changes: 1 }),
     }),
   }),
   getPipelineInstanceById: vi.fn(),
@@ -35,6 +35,12 @@ describe('PipelineExecutor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // 恢复 getDb mock，防止测试间状态泄露
+    (queries as any).getDb = vi.fn().mockReturnValue({
+      prepare: vi.fn().mockReturnValue({
+        run: vi.fn().mockReturnValue({ changes: 1 }),
+      }),
+    });
     executor = new PipelineExecutor();
   });
 
@@ -72,7 +78,7 @@ describe('PipelineExecutor', () => {
 
       // Mock getDb for output update
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.start(1);
@@ -100,10 +106,17 @@ describe('PipelineExecutor', () => {
         ],
       } as any);
 
+      // Mock 原子更新返回 changes=0（有其他 running 阶段）
+      (queries as any).getDb = () => ({
+        prepare: () => ({
+          run: vi.fn().mockReturnValue({ changes: 0 }),
+        }),
+      });
+
       await executor.executeStage(1, 2);
 
-      // 不应该执行任何状态转换
-      expect(stateMachine.transition).not.toHaveBeenCalled();
+      // changes=0 说明没有执行，不应该记录状态转换
+      expect(queries.logStateTransition).not.toHaveBeenCalled();
     });
 
     it('should execute if no other stage is running', async () => {
@@ -125,8 +138,9 @@ describe('PipelineExecutor', () => {
 
       await executor.executeStage(1, 2);
 
-      // 应该执行状态转换
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'running', 'system');
+      // executeStage 使用原子 SQL UPDATE，不走状态机 transition
+      // 验证 updateStageRunHeartbeat 被调用（原子更新成功后才会调用）
+      expect(queries.updateStageRunHeartbeat).toHaveBeenCalledWith(2);
     });
 
     it('should NOT execute if stage is not pending', async () => {
@@ -148,8 +162,8 @@ describe('PipelineExecutor', () => {
 
       await executor.executeStage(1, 1);
 
-      // 不应该执行任何状态转换
-      expect(stateMachine.transition).not.toHaveBeenCalled();
+      // 不应该调用 logStateTransition
+      expect(queries.logStateTransition).not.toHaveBeenCalled();
     });
   });
 
@@ -180,7 +194,7 @@ describe('PipelineExecutor', () => {
 
       // Mock getDb for output update
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.approveStage(1, 1);
@@ -215,7 +229,7 @@ describe('PipelineExecutor', () => {
       vi.mocked(queries.getTaskById).mockReturnValue({ id: 1, status: 'failed' } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.retryStage(1, 1);
@@ -308,7 +322,7 @@ describe('PipelineExecutor', () => {
       } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.retryFrom(1, 'stage_2');
@@ -344,7 +358,7 @@ describe('PipelineExecutor', () => {
       } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.retryFrom(1, 'stage_2');
@@ -370,7 +384,7 @@ describe('PipelineExecutor', () => {
       } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       await executor.retryFrom(1, 'stage_2');
@@ -398,7 +412,7 @@ describe('PipelineExecutor', () => {
       } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       // completed -> pending 通过 retryFrom 是允许的（手动干预，绕过状态机）
@@ -428,7 +442,7 @@ describe('PipelineExecutor', () => {
       } as any);
 
       (queries as any).getDb = () => ({
-        prepare: () => ({ run: vi.fn() }),
+        prepare: () => ({ run: vi.fn().mockReturnValue({ changes: 1 }) }),
       });
 
       // waiting_approval -> pending 通过 retryFrom 是允许的（手动干预，绕过状态机）

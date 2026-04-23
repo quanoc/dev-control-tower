@@ -86,6 +86,10 @@ export class PipelineExecutor {
 
   /**
    * 执行单个阶段（幂等）
+   *
+   * 【核心】使用数据库原子操作防止竞态条件：
+   * 检查是否有其他 running 阶段 AND 当前阶段是 pending，
+   * 只有都满足才更新为 running。SQLite 单写者保证原子性。
    */
   async executeStage(instanceId: number, stageRunId: number): Promise<void> {
     const stageRun = queries.getStageRunById(stageRunId);
@@ -99,24 +103,36 @@ export class PipelineExecutor {
       return;
     }
 
-    // 【关键】检查流水线是否有其他 running 阶段
-    // 这是为了防止 Scheduler 或其他调用者绕过 executeNextStage 的检查
+    // 【关键】原子性检查+更新：
+    // UPDATE ... WHERE id=? AND status='pending'
+    //   AND (SELECT COUNT(*) FROM pipeline_stage_runs WHERE instance_id=? AND status='running') = 0
+    // 如果 changes=0，说明不能执行（有其他 running 或状态不是 pending）
+    const db = queries.getDb();
+    const updateResult = db.prepare(`
+      UPDATE pipeline_stage_runs
+      SET status = 'running', started_at = datetime('now')
+      WHERE id = ?
+        AND status = 'pending'
+        AND (SELECT COUNT(*) FROM pipeline_stage_runs WHERE instance_id = ? AND status = 'running') = 0
+    `).run(stageRunId, instanceId);
+
+    if (updateResult.changes === 0) {
+      console.log(`[Executor] Stage ${stageRunId} cannot start: either not pending or another stage is running`);
+      return;
+    }
+
+    // 原子更新成功，记录状态转换日志
+    queries.logStateTransition('stage', stageRunId, 'pending', 'running', 'system');
+    queries.updateStageRunHeartbeat(stageRunId);
+
+    // 获取实例信息
     const instance = queries.getPipelineInstanceById(instanceId);
     if (!instance) {
       throw new Error(`Pipeline instance ${instanceId} not found`);
     }
-    const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
-    if (runningStage) {
-      console.log(`[Executor] Pipeline ${instanceId} has running stage: ${runningStage.stageKey}, cannot start stage ${stageRun.stageKey}`);
-      return;
-    }
 
     // 获取阶段元信息
     const meta = this.getStageMeta(instance, stageRun.stageKey);
-
-    // 更新状态为 running
-    await stateMachine.transition('stage', stageRunId, 'running', 'system');
-    queries.updateStageRunHeartbeat(stageRunId);
 
     // 更新流水线当前阶段索引
     const stageIndex = instance.stageRuns.findIndex(sr => sr.id === stageRunId);
