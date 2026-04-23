@@ -21,6 +21,10 @@ export class StateMachineError extends Error {
 /**
  * Core state machine engine.
  * Enforces valid state transitions and logs all changes.
+ *
+ * 【关键】使用乐观锁保证状态一致性：
+ * UPDATE ... WHERE id = ? AND status = ?
+ * 如果 changes = 0，说明状态已被其他操作改变，抛出错误。
  */
 export class StateMachine {
   /**
@@ -52,16 +56,10 @@ export class StateMachine {
         break;
       }
       case 'stage': {
-        const allInstances = queries.getAllPipelineInstances();
-        for (const inst of allInstances) {
-          const stageRun = inst.stageRuns.find(sr => sr.id === entityId);
-          if (stageRun) {
-            fromState = stageRun.status;
-            transitions = STAGE_TRANSITIONS;
-            break;
-          }
-        }
-        if (!fromState) throw new Error(`Stage run ${entityId} not found`);
+        const stageRun = queries.getStageRunById(entityId);
+        if (!stageRun) throw new Error(`Stage run ${entityId} not found`);
+        fromState = stageRun.status;
+        transitions = STAGE_TRANSITIONS;
         break;
       }
     }
@@ -78,30 +76,16 @@ export class StateMachine {
       );
     }
 
-    // Execute transition
-    await this.executeTransition(entityType, entityId, fromState, toState, triggeredBy);
-  }
-
-  /**
-   * Execute the state change and persist it.
-   */
-  private async executeTransition(
-    entityType: string,
-    entityId: number,
-    fromState: string | null,
-    toState: string,
-    triggeredBy: string
-  ): Promise<void> {
-    switch (entityType) {
-      case 'task':
-        queries.updateTaskStatus(entityId, toState);
-        break;
-      case 'pipeline':
-        queries.updatePipelineInstanceStatus(entityId, toState);
-        break;
-      case 'stage':
-        queries.updateStageRunStatus(entityId, toState);
-        break;
+    // Execute transition with optimistic locking
+    const updated = await this.executeTransitionWithLock(entityType, entityId, fromState, toState);
+    if (!updated) {
+      throw new StateMachineError(
+        `Concurrent modification: ${entityType} ${entityId} state changed from "${fromState}" before transition to "${toState}" could complete`,
+        entityType,
+        entityId,
+        fromState,
+        toState
+      );
     }
 
     // Log the transition
@@ -110,6 +94,42 @@ export class StateMachine {
     console.log(
       `[StateMachine] ${entityType}:${entityId} ${fromState} → ${toState} (by ${triggeredBy})`
     );
+  }
+
+  /**
+   * Execute the state change with optimistic locking.
+   * Returns true if the update succeeded, false if the state was already changed.
+   */
+  private executeTransitionWithLock(
+    entityType: string,
+    entityId: number,
+    fromState: string,
+    toState: string
+  ): boolean {
+    const db = queries.getDb();
+
+    switch (entityType) {
+      case 'task': {
+        const result = db.prepare(
+          'UPDATE tasks SET status = ? WHERE id = ? AND status = ?'
+        ).run(toState, entityId, fromState);
+        return result.changes > 0;
+      }
+      case 'pipeline': {
+        const result = db.prepare(
+          'UPDATE pipeline_instances SET status = ? WHERE id = ? AND status = ?'
+        ).run(toState, entityId, fromState);
+        return result.changes > 0;
+      }
+      case 'stage': {
+        const result = db.prepare(
+          'UPDATE pipeline_stage_runs SET status = ? WHERE id = ? AND status = ?'
+        ).run(toState, entityId, fromState);
+        return result.changes > 0;
+      }
+      default:
+        return false;
+    }
   }
 }
 

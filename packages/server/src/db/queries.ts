@@ -465,6 +465,16 @@ export function setStageRunStructuredOutput(id: number, structuredOutput: Struct
   ).run(JSON.stringify(structuredOutput), output ?? null, id);
 }
 
+/**
+ * Clear stage run output (for retry-from)
+ */
+export function clearStageRunOutput(id: number): void {
+  const db = getDb();
+  db.prepare(
+    'UPDATE pipeline_stage_runs SET output = NULL, structured_output = NULL, artifacts = NULL, error = NULL, started_at = NULL, completed_at = NULL, heartbeat_at = NULL WHERE id = ?'
+  ).run(id);
+}
+
 // ─── Runtime Context Queries ────────────────────────────────────
 
 /**

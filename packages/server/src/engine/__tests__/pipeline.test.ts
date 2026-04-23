@@ -271,6 +271,7 @@ describe('PipelineExecutor', () => {
       vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
         id: 1,
         status: 'running',
+        taskId: 1,
         stageRuns: [
           { id: 1, status: 'running', stageKey: 'running_stage' },
           { id: 2, status: 'pending', stageKey: 'pending_stage' },
@@ -279,8 +280,10 @@ describe('PipelineExecutor', () => {
 
       await executor.stop(1);
 
-      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(1, 'pending');
+      // stop 将 running 阶段标记为 failed（被用户中断）
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(1, 'failed', 'Stopped by user');
       expect(stateMachine.transition).toHaveBeenCalledWith('pipeline', 1, 'cancelled', 'human');
+      expect(stateMachine.transition).toHaveBeenCalledWith('task', 1, 'cancelled', 'human');
     });
   });
 

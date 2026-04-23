@@ -106,13 +106,6 @@ export class PipelineScheduler {
           console.error(`[Scheduler] Failed to recover pipeline ${instance.id}:`, err);
         }
       }
-
-      // 检查是否有 running 状态但没有心跳的阶段
-      const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
-      if (runningStage && runningStage.startedAt) {
-        // 如果有 running 阶段但没有继续执行，尝试恢复
-        // 这里不做处理，由超时检测来处理
-      }
     }
   }
 

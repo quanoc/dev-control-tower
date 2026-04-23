@@ -2,6 +2,7 @@
  * Output Parser - Simplified
  *
  * Parses agent output as JSON. If parsing fails, returns raw output as fallback.
+ * Supports OpenClaw response format: { result: { payloads: [{ text: "..." }] } }
  */
 
 import type { StepOutput, ParsedOutput, NextStepInput } from './types.js';
@@ -17,8 +18,12 @@ export class OutputParser {
    * Tries JSON parsing first, then extracts URLs as artifacts.
    */
   parse(rawOutput: string): ParsedOutput {
-    // 1. Try to find JSON in the output
-    const jsonOutput = this.tryParseJson(rawOutput);
+    // 1. Try to extract from OpenClaw response format first
+    const openclawOutput = this.tryExtractOpenClawResponse(rawOutput);
+    const textToParse = openclawOutput || rawOutput;
+
+    // 2. Try to find JSON in the output
+    const jsonOutput = this.tryParseJson(textToParse);
     if (jsonOutput) {
       return {
         output: jsonOutput,
@@ -27,12 +32,12 @@ export class OutputParser {
       };
     }
 
-    // 2. Fallback: extract URLs as artifacts, use raw as summary
-    const artifacts = this.extractUrls(rawOutput);
+    // 3. Fallback: extract URLs as artifacts, use raw as summary
+    const artifacts = this.extractUrls(textToParse);
     const fallbackOutput: StepOutput = {
       artifacts,
       nextStepInput: {
-        summary: this.truncate(rawOutput, 300),
+        summary: this.truncate(textToParse, 300),
       },
     };
 
@@ -42,6 +47,46 @@ export class OutputParser {
       success: true,
       error: 'JSON parsing failed, using fallback extraction',
     };
+  }
+
+  /**
+   * Try to extract text from OpenClaw response format.
+   * Format: { result: { payloads: [{ text: "..." }] } }
+   */
+  private tryExtractOpenClawResponse(output: string): string | null {
+    try {
+      const parsed = JSON.parse(output);
+
+      // Check for OpenClaw response structure
+      if (parsed && typeof parsed === 'object') {
+        const obj = parsed as Record<string, unknown>;
+
+        // Try result.payloads[0].text
+        if (obj.result && typeof obj.result === 'object') {
+          const result = obj.result as Record<string, unknown>;
+          if (Array.isArray(result.payloads) && result.payloads.length > 0) {
+            const firstPayload = result.payloads[0];
+            if (firstPayload && typeof firstPayload === 'object' && typeof firstPayload.text === 'string') {
+              return firstPayload.text;
+            }
+          }
+        }
+
+        // Try finalAssistantVisibleText (alternative OpenClaw format)
+        if (typeof obj.finalAssistantVisibleText === 'string') {
+          return obj.finalAssistantVisibleText;
+        }
+
+        // Try finalAssistantRawText
+        if (typeof obj.finalAssistantRawText === 'string') {
+          return obj.finalAssistantRawText;
+        }
+      }
+    } catch {
+      // Not valid JSON, return null
+    }
+
+    return null;
   }
 
   /**

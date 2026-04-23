@@ -165,8 +165,14 @@ export class PipelineExecutor {
       // 获取对应的执行器
       const executor = ExecutorFactory.getExecutor(meta.actorType);
 
-      // 执行（根据 MOCK_MODE 配置决定是否模拟）
-      const result = await executor.execute(context, MOCK_MODE);
+      // 执行（带超时保护，默认 5 分钟）
+      const TIMEOUT_MS = (meta.timeoutSeconds || 300) * 1000;
+      const result = await Promise.race([
+        executor.execute(context, MOCK_MODE),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Stage execution timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+        ),
+      ]);
 
       // 处理 Human 审批
       if (meta.actorType === 'human' && result.error === 'WAITING_APPROVAL') {
@@ -376,14 +382,16 @@ export class PipelineExecutor {
     const instance = queries.getPipelineInstanceById(instanceId);
     if (!instance) return;
 
-    // 将 running 状态的阶段重置为 pending
+    // 将 running 状态的阶段标记为 failed（手动干预，直接更新）
     for (const stage of instance.stageRuns) {
       if (stage.status === 'running') {
-        queries.updateStageRunStatus(stage.id, 'pending');
+        queries.updateStageRunStatus(stage.id, 'failed', 'Stopped by user');
+        queries.logStateTransition('stage', stage.id, 'running', 'failed', 'human');
       }
     }
 
     await stateMachine.transition('pipeline', instanceId, 'cancelled', 'human');
+    await stateMachine.transition('task', instance.taskId, 'cancelled', 'human');
 
     console.log(`[Executor] Pipeline ${instanceId} stopped`);
   }
@@ -436,6 +444,12 @@ export class PipelineExecutor {
     const instance = queries.getPipelineInstanceById(instanceId);
     if (!instance) {
       throw new Error(`Pipeline instance ${instanceId} not found`);
+    }
+
+    // 检查流水线是否可恢复
+    const recoverableStatuses = ['paused', 'failed', 'running'];
+    if (!recoverableStatuses.includes(instance.status)) {
+      throw new Error(`Pipeline is not recoverable, current status: ${instance.status}`);
     }
 
     // 找到指定 step 的索引
@@ -524,6 +538,7 @@ export class PipelineExecutor {
     agentId?: string;
     humanRole?: string;
     componentId?: number;
+    timeoutSeconds?: number;
   } {
     // 从模板中查找阶段定义
     const templateStages = instance.templatePhases
@@ -531,6 +546,8 @@ export class PipelineExecutor {
       : [];
 
     const stageDef = templateStages.find(s => s.key === stageKey);
+
+    const stageRun = instance.stageRuns.find(sr => sr.stageKey === stageKey);
 
     if (stageDef) {
       return {
@@ -541,11 +558,11 @@ export class PipelineExecutor {
         agentId: stageDef.agentId,
         humanRole: stageDef.humanRole,
         componentId: stageDef.componentId,
+        timeoutSeconds: stageRun?.timeoutSeconds,
       };
     }
 
     // 从 stageRun 中获取信息
-    const stageRun = instance.stageRuns.find(sr => sr.stageKey === stageKey);
     if (stageRun) {
       return {
         label: stageRun.stepLabel || stageKey,
