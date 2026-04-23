@@ -16,6 +16,7 @@ vi.mock('../../db/queries.js', () => ({
   setStageRunOutput: vi.fn(),
   advancePipelineStage: vi.fn(),
   logStateTransition: vi.fn(),
+  clearStageRunOutput: vi.fn(),
 }));
 
 // Mock the state machine
@@ -78,6 +79,77 @@ describe('PipelineExecutor', () => {
 
       expect(stateMachine.transition).toHaveBeenCalledWith('pipeline', 1, 'running', 'system');
       expect(stateMachine.transition).toHaveBeenCalledWith('task', 1, 'running', 'system');
+    });
+  });
+
+  describe('executeStage() - running check', () => {
+    it('should NOT execute if another stage is already running', async () => {
+      // 场景：架构设计在 running，尝试执行代码评审
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'code_review',
+      } as any);
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'running',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'running', stageKey: 'architecture' },  // 正在运行！
+          { id: 2, status: 'pending', stageKey: 'code_review' },   // 尝试执行这个
+        ],
+      } as any);
+
+      await executor.executeStage(1, 2);
+
+      // 不应该执行任何状态转换
+      expect(stateMachine.transition).not.toHaveBeenCalled();
+    });
+
+    it('should execute if no other stage is running', async () => {
+      // 场景：架构设计已完成，执行代码评审
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'code_review',
+      } as any);
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'running',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'architecture' },  // 已完成
+          { id: 2, status: 'pending', stageKey: 'code_review' },     // 执行这个
+        ],
+      } as any);
+
+      await executor.executeStage(1, 2);
+
+      // 应该执行状态转换
+      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'running', 'system');
+    });
+
+    it('should NOT execute if stage is not pending', async () => {
+      // 场景：阶段已完成，不应该重复执行
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 1,
+        status: 'completed',
+        stageKey: 'architecture',
+      } as any);
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'running',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'architecture' },
+          { id: 2, status: 'pending', stageKey: 'code_review' },
+        ],
+      } as any);
+
+      await executor.executeStage(1, 1);
+
+      // 不应该执行任何状态转换
+      expect(stateMachine.transition).not.toHaveBeenCalled();
     });
   });
 
@@ -191,6 +263,144 @@ describe('PipelineExecutor', () => {
 
       expect(queries.updateStageRunStatus).toHaveBeenCalledWith(1, 'pending');
       expect(stateMachine.transition).toHaveBeenCalledWith('pipeline', 1, 'cancelled', 'human');
+    });
+  });
+
+  describe('retryFrom()', () => {
+    it('should throw error if pipeline not found', async () => {
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue(undefined as any);
+
+      await expect(executor.retryFrom(999, 'stage_key')).rejects.toThrow('not found');
+    });
+
+    it('should throw error if stage not found', async () => {
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'paused',
+        taskId: 1,
+        stageRuns: [{ id: 1, status: 'completed', stageKey: 'other_stage' }],
+      } as any);
+
+      await expect(executor.retryFrom(1, 'nonexistent_stage')).rejects.toThrow('not found');
+    });
+
+    it('should reset target stage and all subsequent stages to pending', async () => {
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'paused',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'stage_1' },
+          { id: 2, status: 'completed', stageKey: 'stage_2' },  // Target
+          { id: 3, status: 'completed', stageKey: 'stage_3' },  // Should be reset
+          { id: 4, status: 'pending', stageKey: 'stage_4' },    // Already pending
+        ],
+      } as any);
+      vi.mocked(queries.getTaskById).mockReturnValue({ id: 1, status: 'paused' } as any);
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'stage_2',
+      } as any);
+
+      (queries as any).getDb = () => ({
+        prepare: () => ({ run: vi.fn() }),
+      });
+
+      await executor.retryFrom(1, 'stage_2');
+
+      // Should clear output for stages 2, 3, 4
+      expect(queries.clearStageRunOutput).toHaveBeenCalledTimes(3);
+      expect(queries.clearStageRunOutput).toHaveBeenCalledWith(2);
+      expect(queries.clearStageRunOutput).toHaveBeenCalledWith(3);
+      expect(queries.clearStageRunOutput).toHaveBeenCalledWith(4);
+
+      // Should transition stages 2 and 3 to pending (stage 4 is already pending)
+      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
+      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 3, 'pending', 'human');
+      expect(stateMachine.transition).not.toHaveBeenCalledWith('stage', 4, 'pending', 'human');
+    });
+
+    it('should transition pipeline to running if not already', async () => {
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'paused',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'stage_1' },
+          { id: 2, status: 'completed', stageKey: 'stage_2' },
+        ],
+      } as any);
+      vi.mocked(queries.getTaskById).mockReturnValue({ id: 1, status: 'paused' } as any);
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'stage_2',
+      } as any);
+
+      (queries as any).getDb = () => ({
+        prepare: () => ({ run: vi.fn() }),
+      });
+
+      await executor.retryFrom(1, 'stage_2');
+
+      expect(stateMachine.transition).toHaveBeenCalledWith('pipeline', 1, 'running', 'human');
+      expect(stateMachine.transition).toHaveBeenCalledWith('task', 1, 'running', 'human');
+    });
+
+    it('should not transition pipeline if already running', async () => {
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'running',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'stage_1' },
+          { id: 2, status: 'completed', stageKey: 'stage_2' },
+        ],
+      } as any);
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'stage_2',
+      } as any);
+
+      (queries as any).getDb = () => ({
+        prepare: () => ({ run: vi.fn() }),
+      });
+
+      await executor.retryFrom(1, 'stage_2');
+
+      // Should NOT call transition for pipeline/task since already running
+      expect(stateMachine.transition).not.toHaveBeenCalledWith('pipeline', 1, 'running', 'human');
+    });
+
+    it('should handle completed stage transition to pending', async () => {
+      // This test verifies that STAGE_TRANSITIONS allows completed -> pending
+      vi.mocked(queries.getPipelineInstanceById).mockReturnValue({
+        id: 1,
+        status: 'paused',
+        taskId: 1,
+        stageRuns: [
+          { id: 1, status: 'completed', stageKey: 'stage_1' },
+          { id: 2, status: 'completed', stageKey: 'stage_2' },
+        ],
+      } as any);
+      vi.mocked(queries.getTaskById).mockReturnValue({ id: 1, status: 'paused' } as any);
+      vi.mocked(queries.getStageRunById).mockReturnValue({
+        id: 2,
+        status: 'pending',
+        stageKey: 'stage_2',
+      } as any);
+
+      (queries as any).getDb = () => ({
+        prepare: () => ({ run: vi.fn() }),
+      });
+
+      // This should NOT throw - completed -> pending is allowed via retryFrom
+      await executor.retryFrom(1, 'stage_2');
+
+      // Verify the transition was called (state machine will validate)
+      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 2, 'pending', 'human');
     });
   });
 });
