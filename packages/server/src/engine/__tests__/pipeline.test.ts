@@ -244,7 +244,11 @@ describe('PipelineExecutor', () => {
 
       await executor.skipStage(1, 1);
 
-      expect(stateMachine.transition).toHaveBeenCalledWith('stage', 1, 'skipped', 'human');
+      // skipStage 是手动干预，直接更新数据库状态，绕过状态机
+      expect(queries.updateStageRunStatus).toHaveBeenCalledWith(1, 'skipped', 'Skipped by human');
+      expect(queries.logStateTransition).toHaveBeenCalledWith('stage', 1, 'failed', 'skipped', 'human');
+      // 流水线恢复走状态机
+      expect(stateMachine.transition).toHaveBeenCalledWith('pipeline', 1, 'running', 'human');
     });
   });
 

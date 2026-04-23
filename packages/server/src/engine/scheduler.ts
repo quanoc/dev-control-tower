@@ -5,6 +5,16 @@ import { stateMachine } from './statemachine.js';
 /**
  * 流水线调度器
  *
+ * 核心原则：**Batch 执行模型**
+ * - Batch 内并行：同一个 batch 内的 steps 可以并行执行
+ * - Batch 间串行：当前 batch 全部完成后才能进入下一个 batch
+ *
+ * Scheduler 只恢复"卡住"的流水线：
+ * - 有 pending 阶段 AND 当前 batch 无 running 阶段
+ *
+ * 如果当前 batch 已有 running 阶段，必须跳过，等待其自然完成。
+ * 违反此原则会导致不同 batch 的 steps 同时执行！
+ *
  * 职责：
  * 1. 服务启动时恢复卡住的流水线
  * 2. 定时检测超时的阶段
@@ -78,6 +88,12 @@ export class PipelineScheduler {
       // 只处理 running 状态的流水线
       if (instance.status !== 'running') continue;
 
+      // 如果有正在运行的阶段，跳过（等待它完成）
+      const runningStage = instance.stageRuns.find(sr => sr.status === 'running');
+      if (runningStage) {
+        continue;
+      }
+
       // 找到 pending 的阶段
       const pendingStage = instance.stageRuns.find(sr => sr.status === 'pending');
 
@@ -120,20 +136,16 @@ export class PipelineScheduler {
         if (elapsedMs > timeoutMs) {
           console.log(`[Scheduler] Stage ${stage.id} (${stage.stageKey}) timed out after ${Math.round(elapsedMs / 1000)}s`);
 
-          // 直接更新阶段状态（超时是特殊情况，不走状态机验证）
-          // 因为状态已经是 running，直接更新为 failed
-          queries.updateStageRunStatus(stage.id, 'failed', 'Execution timeout');
-          queries.logStateTransition('stage', stage.id, 'running', 'failed', 'system');
+          // 先更新错误信息（不改变状态）
+          const db = queries.getDb();
+          db.prepare('UPDATE pipeline_stage_runs SET error = ? WHERE id = ?')
+            .run('Execution timeout', stage.id);
 
-          // 更新流水线和任务状态
-          queries.updatePipelineInstanceStatus(instance.id, 'failed');
-          queries.logStateTransition('pipeline', instance.id, instance.status, 'failed', 'system');
-
-          const task = queries.getTaskById(instance.taskId);
-          if (task) {
-            queries.updateTaskStatus(instance.taskId, 'failed');
-            queries.logStateTransition('task', instance.taskId, task.status, 'failed', 'system');
-          }
+          // 通过状态机转换状态
+          const { stateMachine } = await import('./statemachine.js');
+          await stateMachine.transition('stage', stage.id, 'failed', 'system');
+          await stateMachine.transition('pipeline', instance.id, 'failed', 'system');
+          await stateMachine.transition('task', instance.taskId, 'failed', 'system');
         }
       }
     }

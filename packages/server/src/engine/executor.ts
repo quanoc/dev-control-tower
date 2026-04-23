@@ -201,7 +201,12 @@ export class PipelineExecutor {
     const instance = queries.getPipelineInstanceById(instanceId);
     if (!instance) return;
 
-    queries.updateStageRunStatus(stageRunId, 'failed', error);
+    // 先更新错误信息（不改变状态）
+    const db = queries.getDb();
+    db.prepare('UPDATE pipeline_stage_runs SET error = ? WHERE id = ?')
+      .run(error, stageRunId);
+
+    // 通过状态机转换状态
     await stateMachine.transition('stage', stageRunId, 'failed', 'system');
     await stateMachine.transition('pipeline', instanceId, 'failed', 'system');
     await stateMachine.transition('task', instance.taskId, 'failed', 'system');
@@ -331,9 +336,9 @@ export class PipelineExecutor {
       throw new Error(`Pipeline instance ${instanceId} not found`);
     }
 
-    // 标记跳过
+    // 手动干预：直接更新数据库状态，绕过状态机
     queries.updateStageRunStatus(stageRunId, 'skipped', 'Skipped by human');
-    await stateMachine.transition('stage', stageRunId, 'skipped', 'human');
+    queries.logStateTransition('stage', stageRunId, 'failed', 'skipped', 'human');
     queries.advancePipelineStage(instanceId);
 
     console.log(`[Executor] Stage ${stageRunId} skipped`);
